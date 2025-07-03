@@ -13,6 +13,8 @@ from werkzeug.security import generate_password_hash, check_password_hash # Mesk
 db = SQLAlchemy()
 migrate = Migrate()
 
+__all__ = ['create_app', 'db', 'migrate']
+
 # Variabel global untuk model ML (akan dimuat di create_app)
 model = None
 le_tingkat = None
@@ -22,7 +24,7 @@ le_kemajuan = None
 # Fungsi Factory untuk Membuat Aplikasi Flask
 # ===============================================
 def create_app():
-    app = Flask(__name__)
+    app = Flask(__name__, template_folder='../admin')
 
     # Konfigurasi Database MySQL
     app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
@@ -34,10 +36,14 @@ def create_app():
 
     # Inisialisasi db dengan aplikasi Flask
     db.init_app(app)
-    migrate.init_app(app, db) # Inisialisasi Flask-Migrate
+    migrate.init_app(app, db)
 
     # Import Models setelah db diinisialisasi
     from app import models # Ini akan mengimpor semua model dari models.py
+
+    # Buat tabel database jika belum ada
+    with app.app_context():
+        db.create_all()
 
     # ===============================================
     # Memuat Model Machine Learning dan Encoder

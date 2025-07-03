@@ -1,5 +1,5 @@
 from flask import request, jsonify, render_template, redirect, url_for
-from app import db, model, le_tingkat, le_kemajuan
+from app.data_migration import db, model, le_tingkat, le_kemajuan
 from werkzeug.security import generate_password_hash, check_password_hash # Meskipun ini tidak langsung dipakai di sini, tapi di models.py
 import datetime
 import numpy as np
