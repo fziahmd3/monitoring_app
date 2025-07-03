@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.pyd
+*.pyo
+
+# Virtual environment
+venv/
+
+# Flask-specific
+instance/
+.flaskenv
+
+# Machine learning output
+output/
+model.ipynb
+
+# Jupyter
+.ipynb_checkpoints 
