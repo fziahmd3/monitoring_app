@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Data Santri</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    {% include 'sidebar.html' %}
+    <div class="main-content">
+        <h1>Edit Data Santri</h1>
+        <form action="/santri/edit/{{ santri.id }}" method="POST">
+            <label for="nama_lengkap">Nama Lengkap:</label>
+            <input type="text" id="nama_lengkap" name="nama_lengkap" value="{{ santri.nama_lengkap }}" required>
+
+            <label for="nis">NIS:</label>
+            <input type="text" id="nis" name="nis" value="{{ santri.nis }}" required>
+
+            <label for="kelas">Kelas:</label>
+            <input type="text" id="kelas" name="kelas" value="{{ santri.kelas or '' }}">
+
+            <label for="alamat">Alamat:</label>
+            <input type="text" id="alamat" name="alamat" value="{{ santri.alamat or '' }}">
+
+            <label for="nama_orang_tua">Nama Orang Tua:</label>
+            <input type="text" id="nama_orang_tua" name="nama_orang_tua" value="{{ santri.nama_orang_tua or '' }}">
+
+            <label for="password">Ganti Password (biarkan kosong jika tidak ingin ganti):</label>
+            <input type="password" id="password" name="password">
+
+            <button type="submit">Update Data Santri</button>
+        </form>
+    </div>
+</body>
+</html> 

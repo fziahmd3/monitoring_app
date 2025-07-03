@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prediksi Kemajuan Hafalan</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    {% include 'sidebar.html' %}
+    <div class="main-content">
+        <div class="container">
+            <h1>Form Prediksi Kemajuan Hafalan</h1>
+            <form action="/predict_web" method="POST">
+                <label for="tingkat_hafalan">Tingkat Hafalan:</label>
+                <select id="tingkat_hafalan" name="tingkat_hafalan" required>
+                    <option value="rendah">Rendah</option>
+                    <option value="sedang">Sedang</option>
+                    <option value="tinggi">Tinggi</option>
+                </select>
+
+                <label for="jumlah_setoran">Jumlah Setoran (per pekan):</label>
+                <input type="number" id="jumlah_setoran" name="jumlah_setoran" required min="1" max="20">
+
+                <label for="nis">NIS Santri:</label>
+                <input type="text" id="nis" name="nis" required>
+
+                <label for="kehadiran">Persentase Kehadiran (%):</label>
+                <input type="number" id="kehadiran" name="kehadiran" required min="0" max="100">
+
+                <button type="submit">Prediksi</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

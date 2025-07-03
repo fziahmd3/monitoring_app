@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manajemen Guru</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    {% include 'sidebar.html' %}
+    <div class="main-content">
+        <h1>Manajemen Guru</h1>
+
+        <h2>Daftar Guru</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>NIP</th>
+                    <th>Nama Lengkap</th>
+                    <th>No. Telepon</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for guru in gurus %}
+                <tr>
+                    <td>{{ guru.nip }}</td>
+                    <td>{{ guru.nama_lengkap }}</td>
+                    <td>{{ guru.no_tlp }}</td>
+                    <td>
+                        <a href="/guru/edit/{{ guru.id }}">Edit</a>
+                        <form action="/guru/delete/{{ guru.id }}" method="POST" style="display:inline;">
+                            <button type="submit" onclick="return confirm('Anda yakin ingin menghapus guru ini?');" class="button-as-link">Hapus</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5">Belum ada data guru.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <h2>Tambah Guru Baru</h2>
+        <form action="/guru" method="POST">
+            <label for="nama_lengkap">Nama Lengkap:</label>
+            <input type="text" id="nama_lengkap" name="nama_lengkap" required>
+
+            <label for="nip">NIP:</label>
+            <input type="text" id="nip" name="nip" required>
+
+            <label for="no_tlp">No. Telepon:</label>
+            <input type="text" id="no_tlp" name="no_tlp">
+
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required>
+
+            <button type="submit">Tambah Guru</button>
+        </form>
+    </div>
+</body>
+</html> 

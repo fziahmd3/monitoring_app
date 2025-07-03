@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hasil Prediksi</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="result-page-container">
+        <h1>Hasil Prediksi Kemajuan Hafalan</h1>
+        <p>Berdasarkan data yang Anda berikan, prediksi kemajuan hafalan adalah:</p>
+        <div class="result">{{ hasil_prediksi }}</div>
+        <p><a href="/predict_form">Kembali</a></p>
+    </div>
+</body>
+</html>

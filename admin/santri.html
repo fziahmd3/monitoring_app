@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manajemen Santri</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    {% include 'sidebar.html' %}
+    <div class="main-content">
+        <h1>Manajemen Santri</h1>
+
+        <h2>Daftar Santri</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>NIS</th>
+                    <th>Nama Lengkap</th>
+                    <th>Kelas</th>
+                    <th>Alamat</th>
+                    <th>Nama Orang Tua</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for santri in santris %}
+                <tr>
+                    <td>{{ santri.nis }}</td>
+                    <td>{{ santri.nama_lengkap }}</td>
+                    <td>{{ santri.kelas }}</td>
+                    <td>{{ santri.alamat }}</td>
+                    <td>{{ santri.nama_orang_tua }}</td>
+                    <td>
+                        <a href="/santri/edit/{{ santri.id }}">Edit</a>
+                        <form action="/santri/delete/{{ santri.id }}" method="POST" style="display:inline;">
+                            <button type="submit" onclick="return confirm('Anda yakin ingin menghapus santri ini?');" class="button-as-link">Hapus</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6">Belum ada data santri.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <h2>Tambah Santri Baru</h2>
+        <form action="/santri" method="POST">
+            <label for="nama_lengkap">Nama Lengkap:</label>
+            <input type="text" id="nama_lengkap" name="nama_lengkap" required>
+
+            <label for="nis">NIS:</label>
+            <input type="text" id="nis" name="nis" required>
+
+            <label for="kelas">Kelas:</label>
+            <input type="text" id="kelas" name="kelas">
+
+            <label for="alamat">Alamat:</label>
+            <input type="text" id="alamat" name="alamat">
+
+            <label for="nama_orang_tua">Nama Orang Tua:</label>
+            <input type="text" id="nama_orang_tua" name="nama_orang_tua">
+
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required>
+
+            <button type="submit">Tambah Santri</button>
+        </form>
+    </div>
+</body>
+</html> 
