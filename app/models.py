@@ -1,5 +1,5 @@
 # app/models.py
-from app.__init__ import db # Mengimpor objek db dari __init__.py
+from app.data_migration import db # Mengimpor objek db dari __init__.py
 from werkzeug.security import generate_password_hash, check_password_hash
 
 # Model Admin
