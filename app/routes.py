@@ -1,6 +1,5 @@
-from flask import request, jsonify, render_template, redirect, url_for
-from app.data_migration import db, model, le_tingkat, le_kemajuan
-from werkzeug.security import generate_password_hash, check_password_hash # Meskipun ini tidak langsung dipakai di sini, tapi di models.py
+from flask import request, jsonify, render_template, redirect, url_for, current_app
+from app.extensions import db # Import db from extensions.py
 import datetime
 import numpy as np
 
@@ -118,7 +117,7 @@ def register_routes(app):
     # Endpoint untuk Prediksi dari Formulir Web (POST)
     @app.route('/predict_web', methods=['POST'])
     def predict_web():
-        if model is None or le_tingkat is None or le_kemajuan is None:
+        if current_app.model is None or current_app.le_tingkat is None or current_app.le_kemajuan is None:
             return render_template('result.html', hasil_prediksi='Error: Machine Learning model not loaded.'), 500
 
         print('Data diterima dari web form:', request.form)
@@ -156,19 +155,19 @@ def register_routes(app):
 
         # Encode tingkat_hafalan_str
         try:
-            tingkat_hafalan_encoded = le_tingkat.transform([tingkat_hafalan_str])[0]
+            tingkat_hafalan_encoded = current_app.le_tingkat.transform([tingkat_hafalan_str])[0]
         except ValueError:
-            return render_template('result.html', hasil_prediksi=f"Error: Tingkat hafalan tidak valid. Harusnya salah satu dari: {le_tingkat.classes_.tolist()}"), 400
+            return render_template('result.html', hasil_prediksi=f"Error: Tingkat hafalan tidak valid. Harusnya salah satu dari: {current_app.le_tingkat.classes_.tolist()}"), 400
 
         # Buat input array NumPy (gunakan kehadiran_persentase untuk prediksi)
         X_input = np.array([[tingkat_hafalan_encoded, jumlah_setoran, kehadiran_persentase]])
         print('X_input untuk prediksi (web):', X_input)
 
         # Lakukan prediksi
-        y_pred_encoded = model.predict(X_input)
+        y_pred_encoded = current_app.model.predict(X_input)
 
         # Inverse transform hasil prediksi
-        label = le_kemajuan.inverse_transform(y_pred_encoded)[0]
+        label = current_app.le_kemajuan.inverse_transform(y_pred_encoded)[0]
 
         # Render halaman hasil dengan prediksi
         return render_template('result.html', hasil_prediksi=label)
@@ -176,7 +175,7 @@ def register_routes(app):
     # Endpoint untuk API (JSON/Query Params)
     @app.route('/api/predict', methods=['POST', 'GET'])
     def api_predict():
-        if model is None or le_tingkat is None or le_kemajuan is None:
+        if current_app.model is None or current_app.le_tingkat is None or current_app.le_kemajuan is None:
             return jsonify({'error': 'Machine Learning model not loaded.'}), 500
 
         tingkat_hafalan_str = None
@@ -213,15 +212,15 @@ def register_routes(app):
             return jsonify({'error': 'No input data provided for prediction'}), 400
 
         try:
-            tingkat_hafalan_encoded = le_tingkat.transform([tingkat_hafalan_str])[0]
+            tingkat_hafalan_encoded = current_app.le_tingkat.transform([tingkat_hafalan_str])[0]
         except ValueError:
-            return jsonify({'error': f"Invalid 'tingkat_hafalan'. Must be one of: {le_tingkat.classes_.tolist()}"}), 400
+            return jsonify({'error': f"Invalid 'tingkat_hafalan'. Must be one of: {current_app.le_tingkat.classes_.tolist()}"}), 400
 
         X_input = np.array([[tingkat_hafalan_encoded, jumlah_setoran, kehadiran]])
         print('X_input untuk prediksi (API):', X_input)
 
-        y_pred_encoded = model.predict(X_input)
-        label = le_kemajuan.inverse_transform(y_pred_encoded)[0]
+        y_pred_encoded = current_app.model.predict(X_input)
+        label = current_app.le_kemajuan.inverse_transform(y_pred_encoded)[0]
 
         return jsonify({'hasil_hafalan': label})
 
