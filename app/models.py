@@ -90,8 +90,10 @@ class OrangTuaSantri(db.Model):
     ortu_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     nama = db.Column(db.String(100), nullable=False)
     alamat = db.Column(db.String(255), nullable=True)
-    nama_santri = db.Column(db.String(100), nullable=False)
+    santri_id = db.Column(db.Integer, db.ForeignKey('Santri.santri_id'), nullable=False)
     nomor_telepon = db.Column(db.String(20), nullable=True)
+
+    santri = db.relationship('Santri', backref=db.backref('orangtua', lazy=True))
 
     def __repr__(self):
         return f'<OrangTuaSantri {self.nama}>'

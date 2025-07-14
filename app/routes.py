@@ -342,7 +342,7 @@ def register_routes(app):
                 else:
                     return jsonify({'message': 'Invalid Santri credentials'}), 401
             elif user_type == 'Orang Tua Santri':
-                user = Santri.query.filter_by(nama_orang_tua=credential).first()
+                user = Santri.query.filter_by(nama_lengkap=credential).first()
                 if user:
                     return jsonify({'message': 'Login successful!', 'display_name': user.nama_orang_tua}), 200
                 else:

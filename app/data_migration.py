@@ -1,4 +1,5 @@
 # app/__init__.py
+import sys
 import os
 import pickle
 import numpy as np
@@ -68,3 +69,28 @@ def create_app():
     register_routes(app)
 
     return app # Mengembalikan instance aplikasi Flask
+
+def update_santri_id_orangtua():
+    from app.models import db, OrangTuaSantri, Santri
+    updated = 0
+    with db.session.begin():
+        ortu_list = OrangTuaSantri.query.all()
+        for ortu in ortu_list:
+            # Cari santri yang nama_orang_tua-nya sama dengan nama ortu
+            santri = Santri.query.filter_by(nama_orang_tua=ortu.nama).first()
+            if santri:
+                ortu.santri_id = santri.santri_id
+                updated += 1
+                print(f"Ortu ID {ortu.ortu_id} diupdate ke santri_id {santri.santri_id}")
+            else:
+                print(f"Tidak ditemukan santri untuk ortu_id {ortu.ortu_id} (nama ortu: {ortu.nama})")
+    db.session.commit()
+    print(f"Update selesai. Total data terupdate: {updated}")
+
+if __name__ == "__main__":
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from run import app
+    with app.app_context():
+        update_santri_id_orangtua()
