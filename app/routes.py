@@ -6,7 +6,7 @@ from werkzeug.security import generate_password_hash, check_password_hash # Mesk
 from werkzeug.utils import secure_filename
 import datetime
 import numpy as np
-from app.models import Santri, Guru, Admin, PredictionResult # Import semua models yang dibutuhkan
+from app.models import Santri, Guru, Admin, PredictionResult, OrangTuaSantri # Import semua models yang dibutuhkan
 
 # Direktori untuk menyimpan foto profil
 UPLOAD_FOLDER = 'app/static/profile_pics'
@@ -369,6 +369,44 @@ def register_routes(app):
             }), 200
         else:
             return jsonify({'message': 'Santri not found'}), 404
+
+    @app.route('/orangtua', methods=['GET', 'POST'])
+    def manajemen_orangtua():
+        if request.method == 'POST':
+            nama = request.form['nama']
+            alamat = request.form.get('alamat')
+            nama_santri = request.form['nama_santri']
+            nomor_telepon = request.form.get('nomor_telepon')
+            ortu = OrangTuaSantri(
+                nama=nama,
+                alamat=alamat,
+                nama_santri=nama_santri,
+                nomor_telepon=nomor_telepon
+            )
+            db.session.add(ortu)
+            db.session.commit()
+            return redirect(url_for('manajemen_orangtua'))
+        ortus = OrangTuaSantri.query.all()
+        return render_template('orangtua.html', ortus=ortus)
+
+    @app.route('/orangtua/edit/<int:ortu_id>', methods=['GET', 'POST'])
+    def edit_orangtua(ortu_id):
+        ortu = OrangTuaSantri.query.get_or_404(ortu_id)
+        if request.method == 'POST':
+            ortu.nama = request.form['nama']
+            ortu.alamat = request.form.get('alamat')
+            ortu.nama_santri = request.form['nama_santri']
+            ortu.nomor_telepon = request.form.get('nomor_telepon')
+            db.session.commit()
+            return redirect(url_for('manajemen_orangtua'))
+        return render_template('edit_orangtua.html', ortu=ortu)
+
+    @app.route('/orangtua/delete/<int:ortu_id>', methods=['POST'])
+    def delete_orangtua(ortu_id):
+        ortu = OrangTuaSantri.query.get_or_404(ortu_id)
+        db.session.delete(ortu)
+        db.session.commit()
+        return redirect(url_for('manajemen_orangtua'))
 
     @app.route('/')
     def admin_dashboard():

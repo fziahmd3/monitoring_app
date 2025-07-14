@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Edit Data Orang Tua Santri</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    {% include 'sidebar.html' %}
+    <div class="main-content">
+        <h1>Edit Data Orang Tua Santri</h1>
+        <form action="/orangtua/edit/{{ ortu.ortu_id }}" method="POST">
+            <label for="nama">Nama Orang Tua:</label>
+            <input type="text" id="nama" name="nama" value="{{ ortu.nama }}" required>
+            <label for="alamat">Alamat:</label>
+            <input type="text" id="alamat" name="alamat" value="{{ ortu.alamat or '' }}">
+            <label for="nama_santri">Nama Santri:</label>
+            <input type="text" id="nama_santri" name="nama_santri" value="{{ ortu.nama_santri }}" required>
+            <label for="nomor_telepon">No. Telepon:</label>
+            <input type="text" id="nomor_telepon" name="nomor_telepon" value="{{ ortu.nomor_telepon or '' }}">
+            <button type="submit">Update Data Orang Tua</button>
+        </form>
+    </div>
+</body>
+</html> 

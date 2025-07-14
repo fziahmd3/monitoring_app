@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Manajemen Orang Tua Santri</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    {% include 'sidebar.html' %}
+    <div class="main-content">
+        <h1>Manajemen Orang Tua Santri</h1>
+        <h2>Daftar Orang Tua</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Nama</th>
+                    <th>Alamat</th>
+                    <th>Nama Santri</th>
+                    <th>No. Telepon</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ortu in ortus %}
+                <tr>
+                    <td>{{ ortu.nama }}</td>
+                    <td>{{ ortu.alamat }}</td>
+                    <td>{{ ortu.nama_santri }}</td>
+                    <td>{{ ortu.nomor_telepon }}</td>
+                    <td>
+                        <a href="/orangtua/edit/{{ ortu.ortu_id }}">Edit</a>
+                        <form action="/orangtua/delete/{{ ortu.ortu_id }}" method="POST" style="display:inline;">
+                            <button type="submit" onclick="return confirm('Yakin hapus data ini?');" class="button-as-link">Hapus</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5">Belum ada data orang tua santri.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <h2>Tambah Orang Tua Santri</h2>
+        <form action="/orangtua" method="POST">
+            <label for="nama">Nama Orang Tua:</label>
+            <input type="text" id="nama" name="nama" required>
+            <label for="alamat">Alamat:</label>
+            <input type="text" id="alamat" name="alamat">
+            <label for="nama_santri">Nama Santri:</label>
+            <input type="text" id="nama_santri" name="nama_santri" required>
+            <label for="nomor_telepon">No. Telepon:</label>
+            <input type="text" id="nomor_telepon" name="nomor_telepon">
+            <button type="submit">Tambah Orang Tua</button>
+        </form>
+    </div>
+</body>
+</html> 
