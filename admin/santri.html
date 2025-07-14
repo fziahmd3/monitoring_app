@@ -32,8 +32,8 @@
                     <td>{{ santri.alamat }}</td>
                     <td>{{ santri.nama_orang_tua }}</td>
                     <td>
-                        <a href="/santri/edit/{{ santri.id }}">Edit</a>
-                        <form action="/santri/delete/{{ santri.id }}" method="POST" style="display:inline;">
+                        <a href="/santri/edit/{{ santri.santri_id }}">Edit</a>
+                        <form action="/santri/delete/{{ santri.santri_id }}" method="POST" style="display:inline;">
                             <button type="submit" onclick="return confirm('Anda yakin ingin menghapus santri ini?');" class="button-as-link">Hapus</button>
                         </form>
                     </td>

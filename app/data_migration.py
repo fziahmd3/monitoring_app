@@ -3,9 +3,16 @@ import os
 import pickle
 import numpy as np
 from flask import Flask, request, jsonify, render_template
-from werkzeug.security import generate_password_hash, check_password_hash
-from app.routes import register_routes
-from app.extensions import db, migrate # Import db and migrate from extensions.py
+from app.extensions import db, migrate # Mengimpor objek db dan migrate dari extensions.py
+from werkzeug.security import generate_password_hash, check_password_hash # Meskipun ini tidak langsung dipakai di sini, tapi di models.py
+
+# ===============================================
+# Inisialisasi SQLAlchemy (tanpa app dulu)
+# ===============================================
+# db = SQLAlchemy()
+# migrate = Migrate()
+
+__all__ = ['create_app', 'db', 'migrate']
 
 # Variabel global untuk model ML (akan dimuat di create_app)
 model = None
@@ -35,19 +42,20 @@ def create_app():
 
     # Buat tabel database jika belum ada
     with app.app_context():
-        db.create_all()
+        # db.create_all() # Tidak perlu lagi di sini, migrasi yang akan menanganinya
+        pass
 
     # ===============================================
     # Memuat Model Machine Learning dan Encoder
     # ===============================================
-    global model, le_tingkat, le_kemajuan # Pastikan ini mengacu pada variabel global
+    global model, le_tingkat, le_kemajuan
     try:
         with open('output/model.pkl', 'rb') as f_model:
-            app.model = pickle.load(f_model)
+            model = pickle.load(f_model)
         with open('output/encoder.pkl', 'rb') as f_enc:
             encoders = pickle.load(f_enc)
-            app.le_tingkat = encoders['tingkat_hafalan']
-            app.le_kemajuan = encoders['kemajuan']
+            le_tingkat = encoders['tingkat_hafalan']
+            le_kemajuan = encoders['kemajuan']
         print("Machine Learning model and encoders loaded successfully.")
     except FileNotFoundError:
         print("Error: model.pkl or encoder.pkl not found. Ensure 'output' directory and files exist.")
@@ -55,12 +63,8 @@ def create_app():
     except Exception as e:
         print(f"Error loading ML models: {e}")
 
-
-    # ===============================================
-    # Endpoint Aplikasi (Routes)
-    # ===============================================
-
-    # Register blueprints or routes
+    # Import dan daftarkan rute
+    from app.routes import register_routes
     register_routes(app)
 
-    return app
+    return app # Mengembalikan instance aplikasi Flask

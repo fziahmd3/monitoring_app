@@ -26,10 +26,10 @@
                 <tr>
                     <td>{{ guru.nip }}</td>
                     <td>{{ guru.nama_lengkap }}</td>
-                    <td>{{ guru.no_tlp }}</td>
+                    <td>{{ guru.nomor_telepon }}</td>
                     <td>
-                        <a href="/guru/edit/{{ guru.id }}">Edit</a>
-                        <form action="/guru/delete/{{ guru.id }}" method="POST" style="display:inline;">
+                        <a href="/guru/edit/{{ guru.guru_id }}">Edit</a>
+                        <form action="/guru/delete/{{ guru.guru_id }}" method="POST" style="display:inline;">
                             <button type="submit" onclick="return confirm('Anda yakin ingin menghapus guru ini?');" class="button-as-link">Hapus</button>
                         </form>
                     </td>

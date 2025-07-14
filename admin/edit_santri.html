@@ -10,7 +10,7 @@
     {% include 'sidebar.html' %}
     <div class="main-content">
         <h1>Edit Data Santri</h1>
-        <form action="/santri/edit/{{ santri.id }}" method="POST">
+        <form action="/santri/edit/{{ santri.santri_id }}" method="POST">
             <label for="nama_lengkap">Nama Lengkap:</label>
             <input type="text" id="nama_lengkap" name="nama_lengkap" value="{{ santri.nama_lengkap }}" required>
 
