@@ -1,5 +1,5 @@
 import os
-from flask import request, jsonify, render_template, redirect, url_for
+from flask import request, jsonify, render_template, redirect, url_for, session
 from app.extensions import db # Import db dari extensions.py
 from app.data_migration import model, le_tingkat, le_kemajuan # Import model dan encoder dari data_migration.py
 from werkzeug.security import generate_password_hash, check_password_hash # Meskipun ini tidak langsung dipakai di sini, tapi di models.py
@@ -370,6 +370,40 @@ def register_routes(app):
         else:
             return jsonify({'message': 'Santri not found'}), 404
 
+    # Endpoint untuk API Profil Guru
+    @app.route('/api/guru_profile/<string:nip>', methods=['GET'])
+    def guru_profile(nip):
+        from app.models import Guru
+        guru = Guru.query.filter_by(nip=nip).first()
+        if guru:
+            return jsonify({
+                'nama_lengkap': guru.nama_lengkap,
+                'nip': guru.nip,
+                'pendidikan_terakhir': guru.pendidikan_terakhir,
+                'nomor_telepon': guru.nomor_telepon,
+                'profile_picture': guru.profile_picture
+            }), 200
+        else:
+            return jsonify({'message': 'Guru not found'}), 404
+
+    # Endpoint untuk API Profil Orang Tua Santri
+    @app.route('/api/orangtua_profile/<string:nama_santri>', methods=['GET'])
+    def orangtua_profile(nama_santri):
+        from app.models import Santri, OrangTuaSantri
+        santri = Santri.query.filter_by(nama_lengkap=nama_santri).first()
+        if not santri:
+            return jsonify({'message': 'Santri not found'}), 404
+        ortu = OrangTuaSantri.query.filter_by(santri_id=santri.santri_id).first()
+        if ortu:
+            return jsonify({
+                'nama': ortu.nama,
+                'alamat': ortu.alamat,
+                'nama_santri': nama_santri,
+                'nomor_telepon': ortu.nomor_telepon
+            }), 200
+        else:
+            return jsonify({'message': 'Orang Tua Santri not found'}), 404
+
     @app.route('/orangtua', methods=['GET', 'POST'])
     def manajemen_orangtua():
         if request.method == 'POST':
@@ -407,6 +441,89 @@ def register_routes(app):
         db.session.delete(ortu)
         db.session.commit()
         return redirect(url_for('manajemen_orangtua'))
+
+    # Endpoint untuk Penilaian Hafalan (POST)
+    @app.route('/api/penilaian', methods=['POST'])
+    def api_penilaian():
+        from app.models import Santri, PenilaianHafalan
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Request body must be JSON'}), 400
+        try:
+            nis = data['nis']
+            surat = data['surat']
+            dari_ayat = int(data['dari_ayat'])
+            sampai_ayat = int(data['sampai_ayat'])
+            penilaian_tajwid = data['penilaian_tajwid']
+        except KeyError as e:
+            return jsonify({'error': f'Missing required field: {e}'}), 400
+        except ValueError:
+            return jsonify({'error': 'dari_ayat dan sampai_ayat harus berupa angka'}), 400
+
+        santri = Santri.query.filter_by(nis=nis).first()
+        if not santri:
+            return jsonify({'error': f'Santri dengan NIS {nis} tidak ditemukan.'}), 404
+
+        penilaian = PenilaianHafalan(
+            santri_id=santri.santri_id,
+            surat=surat,
+            dari_ayat=dari_ayat,
+            sampai_ayat=sampai_ayat,
+            penilaian_tajwid=penilaian_tajwid
+        )
+        db.session.add(penilaian)
+        db.session.commit()
+        return jsonify({'message': 'Penilaian hafalan berhasil disimpan.'}), 200
+
+    # Endpoint untuk mengambil riwayat penilaian hafalan santri
+    @app.route('/api/santri/<string:nis>/penilaian', methods=['GET'])
+    def get_riwayat_penilaian(nis):
+        from app.models import Santri, PenilaianHafalan
+        santri = Santri.query.filter_by(nis=nis).first()
+        if not santri:
+            return jsonify({'error': f'Santri dengan NIS {nis} tidak ditemukan.'}), 404
+        penilaian_list = PenilaianHafalan.query.filter_by(santri_id=santri.santri_id).order_by(PenilaianHafalan.tanggal_penilaian.desc()).all()
+        result = []
+        for p in penilaian_list:
+            result.append({
+                'penilaian_id': p.penilaian_id,
+                'surat': p.surat,
+                'dari_ayat': p.dari_ayat,
+                'sampai_ayat': p.sampai_ayat,
+                'penilaian_tajwid': p.penilaian_tajwid,
+                'tanggal_penilaian': p.tanggal_penilaian.isoformat()
+            })
+        return jsonify(result), 200
+
+    # Endpoint untuk daftar santri (untuk dropdown guru di mobile)
+    @app.route('/api/daftar_santri', methods=['GET'])
+    def api_daftar_santri():
+        from app.models import Santri
+        santri_list = Santri.query.all()
+        result = []
+        for s in santri_list:
+            result.append({
+                'nis': s.nis,
+                'nama_lengkap': s.nama_lengkap
+            })
+        return jsonify(result), 200
+
+    # Endpoint Login Admin (Web)
+    @app.route('/login_admin', methods=['GET', 'POST'])
+    def login_admin():
+        from app.models import Admin
+        error = None
+        if request.method == 'POST':
+            username = request.form.get('username')
+            password = request.form.get('password')
+            admin = Admin.query.filter_by(username=username).first()
+            if admin and admin.check_password(password):
+                session['admin_logged_in'] = True
+                session['admin_username'] = username
+                return redirect(url_for('admin_dashboard'))
+            else:
+                error = 'Username atau password salah.'
+        return render_template('login_admin.html', error=error)
 
     @app.route('/')
     def admin_dashboard():

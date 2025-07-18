@@ -8,7 +8,6 @@ class Admin(db.Model):
     admin_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
-    nama_lengkap = db.Column(db.String(100))
     last_login = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
     updated_at = db.Column(db.DateTime, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
@@ -97,3 +96,18 @@ class OrangTuaSantri(db.Model):
 
     def __repr__(self):
         return f'<OrangTuaSantri {self.nama}>'
+
+class PenilaianHafalan(db.Model):
+    __tablename__ = 'PenilaianHafalan'
+    penilaian_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    santri_id = db.Column(db.Integer, db.ForeignKey('Santri.santri_id'), nullable=False)
+    surat = db.Column(db.String(50), nullable=False)
+    dari_ayat = db.Column(db.Integer, nullable=False)
+    sampai_ayat = db.Column(db.Integer, nullable=False)
+    penilaian_tajwid = db.Column(db.String(20), nullable=False)
+    tanggal_penilaian = db.Column(db.DateTime, default=db.func.current_timestamp())
+
+    santri = db.relationship('Santri', backref=db.backref('penilaian_hafalan', lazy=True))
+
+    def __repr__(self):
+        return f'<PenilaianHafalan {self.penilaian_id} - Santri ID: {self.santri_id}>'
