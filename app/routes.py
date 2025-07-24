@@ -6,7 +6,7 @@ from werkzeug.security import generate_password_hash, check_password_hash # Mesk
 from werkzeug.utils import secure_filename
 import datetime
 import numpy as np
-from app.models import Santri, Guru, Admin, PredictionResult, OrangTuaSantri # Import semua models yang dibutuhkan
+from app.models import Santri, Guru, Admin, OrangTuaSantri # Import semua models yang dibutuhkan
 
 # Direktori untuk menyimpan foto profil
 UPLOAD_FOLDER = 'app/static/profile_pics'
@@ -47,7 +47,7 @@ def register_routes(app):
             if user_type == 'Santri':
                 user = Santri.query.filter_by(nis=credential).first()
             elif user_type == 'Guru':
-                user = Guru.query.filter_by(nip=credential).first()
+                user = Guru.query.filter_by(kode_guru=credential).first()
             elif user_type == 'Admin':
                 user = Admin.query.filter_by(username=credential).first()
 
@@ -66,16 +66,16 @@ def register_routes(app):
         from app.models import Guru  # Import model Guru di sini
         if request.method == 'POST':
             nama_lengkap = request.form['nama_lengkap']
-            nip = request.form['nip']
-            pendidikan_terakhir = request.form.get('pendidikan_terakhir')
+            kode_guru = request.form['kode_guru']
+            status_pengajar = request.form.get('status_pengajar')
             no_tlp = request.form.get('no_tlp')
             password = request.form['password']
 
             new_guru = Guru(
                 nama_lengkap=nama_lengkap,
-                nip=nip,
-                pendidikan_terakhir=pendidikan_terakhir,
-                nomor_telepon=no_tlp # Perbaikan di sini
+                kode_guru=kode_guru,
+                status_pengajar=status_pengajar,
+                nomor_telepon=no_tlp
             )
             new_guru.set_password(password)
             db.session.add(new_guru)
@@ -91,8 +91,8 @@ def register_routes(app):
         guru = Guru.query.get_or_404(guru_id)
         if request.method == 'POST':
             guru.nama_lengkap = request.form['nama_lengkap']
-            guru.nip = request.form['nip']
-            guru.pendidikan_terakhir = request.form.get('pendidikan_terakhir')
+            guru.kode_guru = request.form['kode_guru']
+            guru.status_pengajar = request.form.get('status_pengajar')
             guru.nomor_telepon = request.form.get('no_tlp')
             password = request.form.get('password')
             if password:
@@ -115,16 +115,16 @@ def register_routes(app):
         from app.models import Santri # Import model Santri di sini
         if request.method == 'POST':
             nama_lengkap = request.form['nama_lengkap']
-            nis = request.form['nis']
-            kelas = request.form.get('kelas')
+            kode_santri = request.form['kode_santri']
+            tingkatan = request.form.get('tingkatan')
             alamat = request.form.get('alamat')
             nama_orang_tua = request.form.get('nama_orang_tua')
             password = request.form['password']
 
             new_santri = Santri(
                 nama_lengkap=nama_lengkap,
-                nis=nis,
-                kelas=kelas,
+                kode_santri=kode_santri,
+                tingkatan=tingkatan,
                 alamat=alamat,
                 nama_orang_tua=nama_orang_tua
             )
@@ -142,8 +142,8 @@ def register_routes(app):
         santri = Santri.query.get_or_404(santri_id)
         if request.method == 'POST':
             santri.nama_lengkap = request.form['nama_lengkap']
-            santri.nis = request.form['nis']
-            santri.kelas = request.form.get('kelas')
+            santri.kode_santri = request.form['kode_santri']
+            santri.tingkatan = request.form.get('tingkatan')
             santri.alamat = request.form.get('alamat')
             santri.nama_orang_tua = request.form.get('nama_orang_tua')
             password = request.form.get('password')
@@ -179,11 +179,11 @@ def register_routes(app):
             tingkat_hafalan_str = request.form['tingkat_hafalan']
             jumlah_setoran = int(request.form['jumlah_setoran'])
             kehadiran_persentase = int(request.form['kehadiran']) # Ubah nama variabel agar tidak ambigu
-            nis = request.form['nis'] # Ambil NIS dari form
+            kode_santri = request.form['kode_santri'] # Ambil NIS dari form
 
-            santri = Santri.query.filter_by(nis=nis).first()
+            santri = Santri.query.filter_by(kode_santri=kode_santri).first()
             if not santri:
-                return render_template('result.html', hasil_prediksi=f'Error: Santri dengan NIS {nis} tidak ditemukan.'), 404
+                return render_template('result.html', hasil_prediksi=f'Error: Santri dengan NIS {kode_santri} tidak ditemukan.'), 404
 
             status_kehadiran = "Hadir" if kehadiran_persentase > 0 else "Tidak Hadir"
             nilai_kehadiran_db = 1 if kehadiran_persentase > 0 else 0
@@ -225,7 +225,7 @@ def register_routes(app):
         tingkat_hafalan_str = None
         jumlah_setoran = None
         kehadiran = None
-        nis = None # Tambahkan variabel nis
+        kode_santri = None # Tambahkan variabel nis
 
         if request.method == 'POST':
             data = request.get_json()
@@ -236,11 +236,11 @@ def register_routes(app):
                 tingkat_hafalan_str = data['tingkat_hafalan']
                 jumlah_setoran = int(data['jumlah_setoran'])
                 kehadiran = int(data['kehadiran'])
-                nis = data['nis'] # Ambil NIS dari request
+                kode_santri = data['kode_santri'] # Ambil NIS dari request
             except KeyError as e:
                 return jsonify({'error': f'Missing required field in JSON: {e}'}), 400
             except ValueError:
-                return jsonify({'error': 'jumlah_setoran, kehadiran, and nis must be valid types in JSON'}), 400
+                return jsonify({'error': 'jumlah_setoran, kehadiran, and kode_santri must be valid types in JSON'}), 400
 
         elif request.method == 'GET':
             print('Data diterima (API GET dari query parameters):', request.args)
@@ -248,14 +248,14 @@ def register_routes(app):
                 tingkat_hafalan_str = request.args.get('tingkat_hafalan')
                 jumlah_setoran = int(request.args.get('jumlah_setoran'))
                 kehadiran = int(request.args.get('kehadiran'))
-                nis = request.args.get('nis') # Ambil NIS dari query params
+                kode_santri = request.args.get('kode_santri') # Ambil NIS dari query params
             except (TypeError, ValueError) as e:
-                return jsonify({'error': f'Invalid or missing query parameters. Ensure tingkat_hafalan (string), jumlah_setoran (int), kehadiran (int), and nis (string) are provided. Error: {e}'}), 400
+                return jsonify({'error': f'Invalid or missing query parameters. Ensure tingkat_hafalan (string), jumlah_setoran (int), kehadiran (int), and kode_santri (string) are provided. Error: {e}'}), 400
 
         # Cari santri berdasarkan NIS
-        santri = Santri.query.filter_by(nis=nis).first()
+        santri = Santri.query.filter_by(kode_santri=kode_santri).first()
         if not santri:
-            return jsonify({'error': f'Santri with NIS {nis} not found.'}), 404
+            return jsonify({'error': f'Santri with NIS {kode_santri} not found.'}), 404
 
         try:
             tingkat_hafalan_encoded = le_tingkat.transform([tingkat_hafalan_str])[0]
@@ -282,12 +282,12 @@ def register_routes(app):
         return jsonify({'hasil_hafalan': label}), 200
 
     # Endpoint baru untuk mengambil riwayat prediksi santri
-    @app.route('/api/santri/<string:nis>/predictions', methods=['GET'])
-    def get_santri_predictions(nis):
+    @app.route('/api/santri/<string:kode_santri>/predictions', methods=['GET'])
+    def get_santri_predictions(kode_santri):
         from app.models import Santri, PredictionResult # Pastikan import models di sini juga
-        santri = Santri.query.filter_by(nis=nis).first()
+        santri = Santri.query.filter_by(kode_santri=kode_santri).first()
         if not santri:
-            return jsonify({'error': f'Santri with NIS {nis} not found.'}), 404
+            return jsonify({'error': f'Santri with NIS {kode_santri} not found.'}), 404
         
         predictions = PredictionResult.query.filter_by(santri_id=santri.santri_id).order_by(PredictionResult.predicted_at.desc()).all()
         
@@ -330,13 +330,13 @@ def register_routes(app):
                 else:
                     return jsonify({'message': 'Invalid Admin credentials'}), 401
             elif user_type == 'Guru':
-                user = Guru.query.filter_by(nip=credential).first()
+                user = Guru.query.filter_by(kode_guru=credential).first()
                 if user:
                     return jsonify({'message': 'Login successful!', 'display_name': user.nama_lengkap}), 200
                 else:
                     return jsonify({'message': 'Invalid Guru credentials'}), 401
             elif user_type == 'Santri':
-                user = Santri.query.filter_by(nis=credential).first()
+                user = Santri.query.filter_by(kode_santri=credential).first()
                 if user:
                     return jsonify({'message': 'Login successful!', 'display_name': user.nama_lengkap, 'profile_picture': user.profile_picture}), 200
                 else:
@@ -354,15 +354,15 @@ def register_routes(app):
             return jsonify({'message': f'An unexpected error occurred: {str(e)}'}), 500
 
     # Endpoint untuk API Profil Santri
-    @app.route('/api/santri_profile/<string:nis>', methods=['GET'])
-    def santri_profile(nis):
+    @app.route('/api/santri_profile/<string:kode_santri>', methods=['GET'])
+    def santri_profile(kode_santri):
         from app.models import Santri
-        santri = Santri.query.filter_by(nis=nis).first()
+        santri = Santri.query.filter_by(kode_santri=kode_santri).first()
         if santri:
             return jsonify({
                 'nama_lengkap': santri.nama_lengkap,
-                'nis': santri.nis,
-                'kelas': santri.kelas,
+                'kode_santri': santri.kode_santri,
+                'tingkatan': santri.tingkatan,
                 'alamat': santri.alamat,
                 'nama_orang_tua': santri.nama_orang_tua,
                 'profile_picture': santri.profile_picture # Sertakan path gambar profil
@@ -371,15 +371,15 @@ def register_routes(app):
             return jsonify({'message': 'Santri not found'}), 404
 
     # Endpoint untuk API Profil Guru
-    @app.route('/api/guru_profile/<string:nip>', methods=['GET'])
-    def guru_profile(nip):
+    @app.route('/api/guru_profile/<string:kode_guru>', methods=['GET'])
+    def guru_profile(kode_guru):
         from app.models import Guru
-        guru = Guru.query.filter_by(nip=nip).first()
+        guru = Guru.query.filter_by(kode_guru=kode_guru).first()
         if guru:
             return jsonify({
                 'nama_lengkap': guru.nama_lengkap,
-                'nip': guru.nip,
-                'pendidikan_terakhir': guru.pendidikan_terakhir,
+                'kode_guru': guru.kode_guru,
+                'status_pengajar': guru.status_pengajar,
                 'nomor_telepon': guru.nomor_telepon,
                 'profile_picture': guru.profile_picture
             }), 200
@@ -450,7 +450,7 @@ def register_routes(app):
         if not data:
             return jsonify({'error': 'Request body must be JSON'}), 400
         try:
-            nis = data['nis']
+            kode_santri = data['kode_santri']
             surat = data['surat']
             dari_ayat = int(data['dari_ayat'])
             sampai_ayat = int(data['sampai_ayat'])
@@ -460,9 +460,9 @@ def register_routes(app):
         except ValueError:
             return jsonify({'error': 'dari_ayat dan sampai_ayat harus berupa angka'}), 400
 
-        santri = Santri.query.filter_by(nis=nis).first()
+        santri = Santri.query.filter_by(kode_santri=kode_santri).first()
         if not santri:
-            return jsonify({'error': f'Santri dengan NIS {nis} tidak ditemukan.'}), 404
+            return jsonify({'error': f'Santri dengan NIS {kode_santri} tidak ditemukan.'}), 404
 
         penilaian = PenilaianHafalan(
             santri_id=santri.santri_id,
@@ -476,12 +476,12 @@ def register_routes(app):
         return jsonify({'message': 'Penilaian hafalan berhasil disimpan.'}), 200
 
     # Endpoint untuk mengambil riwayat penilaian hafalan santri
-    @app.route('/api/santri/<string:nis>/penilaian', methods=['GET'])
-    def get_riwayat_penilaian(nis):
+    @app.route('/api/santri/<string:kode_santri>/penilaian', methods=['GET'])
+    def get_riwayat_penilaian(kode_santri):
         from app.models import Santri, PenilaianHafalan
-        santri = Santri.query.filter_by(nis=nis).first()
+        santri = Santri.query.filter_by(kode_santri=kode_santri).first()
         if not santri:
-            return jsonify({'error': f'Santri dengan NIS {nis} tidak ditemukan.'}), 404
+            return jsonify({'error': f'Santri dengan NIS {kode_santri} tidak ditemukan.'}), 404
         penilaian_list = PenilaianHafalan.query.filter_by(santri_id=santri.santri_id).order_by(PenilaianHafalan.tanggal_penilaian.desc()).all()
         result = []
         for p in penilaian_list:
@@ -503,7 +503,7 @@ def register_routes(app):
         result = []
         for s in santri_list:
             result.append({
-                'nis': s.nis,
+                'kode_santri': s.kode_santri,
                 'nama_lengkap': s.nama_lengkap
             })
         return jsonify(result), 200

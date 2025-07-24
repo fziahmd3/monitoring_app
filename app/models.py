@@ -27,13 +27,13 @@ class Guru(db.Model):
     __tablename__ = 'Guru'
     guru_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     nama_lengkap = db.Column(db.String(100), nullable=False)
-    nip = db.Column(db.String(20), unique=True, nullable=False)
-    pendidikan_terakhir = db.Column(db.String(50))
+    kode_guru = db.Column(db.String(20), unique=True, nullable=False)  # Ganti NIP dengan kode_guru
+    status_pengajar = db.Column(db.String(50))  # Misal: ustadz, ustadzah, pembina, dll
     nomor_telepon = db.Column(db.String(15))
     password_hash = db.Column(db.String(128), nullable=False)
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
     updated_at = db.Column(db.DateTime, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
-    profile_picture = db.Column(db.String(255), nullable=True) # Tambahkan field ini
+    profile_picture = db.Column(db.String(255), nullable=True)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -42,21 +42,21 @@ class Guru(db.Model):
         return check_password_hash(self.password_hash, password)
 
     def __repr__(self):
-        return f'<Guru {self.nama_lengkap} (NIP: {self.nip})>'
+        return f'<Guru {self.nama_lengkap} (Kode: {self.kode_guru})>'
 
 # Model Santri
 class Santri(db.Model):
     __tablename__ = 'Santri'
     santri_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     nama_lengkap = db.Column(db.String(100), nullable=False)
-    nis = db.Column(db.String(20), unique=True, nullable=False)
-    kelas = db.Column(db.String(50), nullable=False)
+    kode_santri = db.Column(db.String(20), unique=True, nullable=False)  # ganti nis
+    tingkatan = db.Column(db.String(50), nullable=False)  # ganti kelas
     alamat = db.Column(db.Text)
     nama_orang_tua = db.Column(db.String(100), nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
     updated_at = db.Column(db.DateTime, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
-    profile_picture = db.Column(db.String(255), nullable=True) # Tambahkan field ini
+    profile_picture = db.Column(db.String(255), nullable=True)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -65,24 +65,24 @@ class Santri(db.Model):
         return check_password_hash(self.password_hash, password)
 
     def __repr__(self):
-        return f'<Santri {self.nama_lengkap} (NIS: {self.nis})>'
+        return f'<Santri {self.nama_lengkap} (Kode: {self.kode_santri})>'
 
 # Model Hasil Prediksi
-class PredictionResult(db.Model):
-    __tablename__ = 'PredictionResult'
-    prediction_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    santri_id = db.Column(db.Integer, db.ForeignKey('Santri.santri_id'), nullable=False)
-    tingkat_hafalan = db.Column(db.String(50), nullable=False)
-    jumlah_setoran = db.Column(db.Integer, nullable=False)
-    kehadiran = db.Column(db.Integer, nullable=False)
-    hasil_prediksi = db.Column(db.String(50), nullable=False)
-    predicted_at = db.Column(db.DateTime, default=db.func.current_timestamp())
-
-    # Relasi dengan model Santri
-    santri = db.relationship('Santri', backref=db.backref('predictions', lazy=True))
-
-    def __repr__(self):
-        return f'<PredictionResult {self.prediction_id} for Santri ID: {self.santri_id}>'
+# class PredictionResult(db.Model):
+#     __tablename__ = 'PredictionResult'
+#     prediction_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+#     santri_id = db.Column(db.Integer, db.ForeignKey('Santri.santri_id'), nullable=False)
+#     tingkat_hafalan = db.Column(db.String(50), nullable=False)
+#     jumlah_setoran = db.Column(db.Integer, nullable=False)
+#     kehadiran = db.Column(db.Integer, nullable=False)
+#     hasil_prediksi = db.Column(db.String(50), nullable=False)
+#     predicted_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+#
+#     # Relasi dengan model Santri
+#     santri = db.relationship('Santri', backref=db.backref('predictions', lazy=True))
+#
+#     def __repr__(self):
+#         return f'<PredictionResult {self.prediction_id} for Santri ID: {self.santri_id}>'
 
 class OrangTuaSantri(db.Model):
     __tablename__ = 'OrangTuaSantri'

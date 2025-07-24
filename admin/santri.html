@@ -15,9 +15,9 @@
         <table>
             <thead>
                 <tr>
-                    <th>NIS</th>
+                    <th>Kode Santri</th>
                     <th>Nama Lengkap</th>
-                    <th>Kelas</th>
+                    <th>Tingkatan</th>
                     <th>Alamat</th>
                     <th>Nama Orang Tua</th>
                     <th>Aksi</th>
@@ -26,9 +26,9 @@
             <tbody>
                 {% for santri in santris %}
                 <tr>
-                    <td>{{ santri.nis }}</td>
+                    <td>{{ santri.kode_santri }}</td>
                     <td>{{ santri.nama_lengkap }}</td>
-                    <td>{{ santri.kelas }}</td>
+                    <td>{{ santri.tingkatan }}</td>
                     <td>{{ santri.alamat }}</td>
                     <td>{{ santri.nama_orang_tua }}</td>
                     <td>
@@ -51,11 +51,11 @@
             <label for="nama_lengkap">Nama Lengkap:</label>
             <input type="text" id="nama_lengkap" name="nama_lengkap" required>
 
-            <label for="nis">NIS:</label>
-            <input type="text" id="nis" name="nis" required>
+            <label for="kode_santri">Kode Santri:</label>
+            <input type="text" id="kode_santri" name="kode_santri" required>
 
-            <label for="kelas">Kelas:</label>
-            <input type="text" id="kelas" name="kelas">
+            <label for="tingkatan">Tingkatan:</label>
+            <input type="text" id="tingkatan" name="tingkatan">
 
             <label for="alamat">Alamat:</label>
             <input type="text" id="alamat" name="alamat">

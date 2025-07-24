@@ -15,8 +15,9 @@
         <table>
             <thead>
                 <tr>
-                    <th>NIP</th>
+                    <th>Kode Guru</th>
                     <th>Nama Lengkap</th>
+                    <th>Status Pengajar</th>
                     <th>No. Telepon</th>
                     <th>Aksi</th>
                 </tr>
@@ -24,8 +25,9 @@
             <tbody>
                 {% for guru in gurus %}
                 <tr>
-                    <td>{{ guru.nip }}</td>
+                    <td>{{ guru.kode_guru }}</td>
                     <td>{{ guru.nama_lengkap }}</td>
+                    <td>{{ guru.status_pengajar }}</td>
                     <td>{{ guru.nomor_telepon }}</td>
                     <td>
                         <a href="/guru/edit/{{ guru.guru_id }}">Edit</a>
@@ -44,11 +46,14 @@
 
         <h2>Tambah Guru Baru</h2>
         <form action="/guru" method="POST">
+            <label for="kode_guru">Kode Guru:</label>
+            <input type="text" id="kode_guru" name="kode_guru" required>
+
             <label for="nama_lengkap">Nama Lengkap:</label>
             <input type="text" id="nama_lengkap" name="nama_lengkap" required>
 
-            <label for="nip">NIP:</label>
-            <input type="text" id="nip" name="nip" required>
+            <label for="status_pengajar">Status Pengajar:</label>
+            <input type="text" id="status_pengajar" name="status_pengajar" required>
 
             <label for="no_tlp">No. Telepon:</label>
             <input type="text" id="no_tlp" name="no_tlp">
