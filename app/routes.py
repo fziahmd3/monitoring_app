@@ -6,7 +6,9 @@ from werkzeug.security import generate_password_hash, check_password_hash # Mesk
 from werkzeug.utils import secure_filename
 import datetime
 import numpy as np
-from app.models import Santri, Guru, Admin, OrangTuaSantri # Import semua models yang dibutuhkan
+from app.models import Santri, Guru, Admin, OrangTuaSantri, PenilaianHafalan # Import semua models yang dibutuhkan
+from sklearn.naive_bayes import GaussianNB # Import Gaussian Naive Bayes
+from sklearn.preprocessing import LabelEncoder # Import LabelEncoder
 
 # Direktori untuk menyimpan foto profil
 UPLOAD_FOLDER = 'app/static/profile_pics'
@@ -17,6 +19,42 @@ def allowed_file(filename):
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def register_routes(app):
+    # Inisialisasi dan latih model Naive Bayes sederhana
+    global naive_bayes_model, le_hasil_penilaian
+    
+    # Contoh data pelatihan (X: tajwid, kelancaran, kefasihan; y: hasil penilaian)
+    # Ini adalah contoh sederhana. Dalam aplikasi nyata, Anda akan melatih ini dengan data historis yang lebih besar.
+    X_train_nb = np.array([
+        [5, 5, 5], # Sangat Baik
+        [4, 5, 4], # Sangat Baik
+        [5, 4, 5], # Sangat Baik
+        [4, 4, 4], # Baik
+        [3, 4, 3], # Baik
+        [4, 3, 4], # Baik
+        [3, 3, 3], # Cukup
+        [2, 3, 2], # Cukup
+        [3, 2, 3], # Cukup
+        [2, 2, 2], # Kurang
+        [1, 2, 1], # Kurang
+        [2, 1, 2], # Kurang
+        [1, 1, 1], # Sangat Kurang
+    ])
+    y_train_nb = np.array([
+        'Sangat Baik', 'Sangat Baik', 'Sangat Baik',
+        'Baik', 'Baik', 'Baik',
+        'Cukup', 'Cukup', 'Cukup',
+        'Kurang', 'Kurang', 'Kurang',
+        'Sangat Kurang',
+    ])
+
+    le_hasil_penilaian = LabelEncoder()
+    y_train_encoded = le_hasil_penilaian.fit_transform(y_train_nb)
+
+    naive_bayes_model = GaussianNB()
+    naive_bayes_model.fit(X_train_nb, y_train_encoded)
+    
+    print("Naive Bayes model and encoder for penilaian loaded successfully.")
+
     # Pastikan direktori upload ada
     if not os.path.exists(UPLOAD_FOLDER):
         os.makedirs(UPLOAD_FOLDER)
@@ -216,264 +254,64 @@ def register_routes(app):
 
         return render_template('result.html', hasil_prediksi=label)
 
-    # Endpoint untuk API (JSON/Query Params)
-    @app.route('/api/predict', methods=['POST', 'GET'])
-    def api_predict():
-        if model is None or le_tingkat is None or le_kemajuan is None:
-            return jsonify({'error': 'Machine Learning model not loaded.'}), 500
-
-        tingkat_hafalan_str = None
-        jumlah_setoran = None
-        kehadiran = None
-        kode_santri = None # Tambahkan variabel nis
-
-        if request.method == 'POST':
-            data = request.get_json()
-            if not data:
-                return jsonify({'error': 'Request body must be JSON for POST method'}), 400
-            print('Data diterima (API POST):', data)
-            try:
-                tingkat_hafalan_str = data['tingkat_hafalan']
-                jumlah_setoran = int(data['jumlah_setoran'])
-                kehadiran = int(data['kehadiran'])
-                kode_santri = data['kode_santri'] # Ambil NIS dari request
-            except KeyError as e:
-                return jsonify({'error': f'Missing required field in JSON: {e}'}), 400
-            except ValueError:
-                return jsonify({'error': 'jumlah_setoran, kehadiran, and kode_santri must be valid types in JSON'}), 400
-
-        elif request.method == 'GET':
-            print('Data diterima (API GET dari query parameters):', request.args)
-            try:
-                tingkat_hafalan_str = request.args.get('tingkat_hafalan')
-                jumlah_setoran = int(request.args.get('jumlah_setoran'))
-                kehadiran = int(request.args.get('kehadiran'))
-                kode_santri = request.args.get('kode_santri') # Ambil NIS dari query params
-            except (TypeError, ValueError) as e:
-                return jsonify({'error': f'Invalid or missing query parameters. Ensure tingkat_hafalan (string), jumlah_setoran (int), kehadiran (int), and kode_santri (string) are provided. Error: {e}'}), 400
-
-        # Cari santri berdasarkan NIS
-        santri = Santri.query.filter_by(kode_santri=kode_santri).first()
-        if not santri:
-            return jsonify({'error': f'Santri with NIS {kode_santri} not found.'}), 404
-
-        try:
-            tingkat_hafalan_encoded = le_tingkat.transform([tingkat_hafalan_str])[0]
-        except ValueError:
-            return jsonify({'error': f"Invalid tingkat_hafalan. Must be one of: {le_tingkat.classes_.tolist()}"}), 400
-
-        X_input = np.array([[tingkat_hafalan_encoded, jumlah_setoran, kehadiran]])
-        print('X_input untuk prediksi (API):', X_input)
-
-        y_pred_encoded = model.predict(X_input)
-        label = le_kemajuan.inverse_transform(y_pred_encoded)[0]
-
-        # Simpan hasil prediksi ke database
-        new_prediction = PredictionResult(
-            santri_id=santri.santri_id,
-            tingkat_hafalan=tingkat_hafalan_str,
-            jumlah_setoran=jumlah_setoran,
-            kehadiran=kehadiran,
-            hasil_prediksi=label
-        )
-        db.session.add(new_prediction)
-        db.session.commit()
-
-        return jsonify({'hasil_hafalan': label}), 200
-
-    # Endpoint baru untuk mengambil riwayat prediksi santri
-    @app.route('/api/santri/<string:kode_santri>/predictions', methods=['GET'])
-    def get_santri_predictions(kode_santri):
-        from app.models import Santri, PredictionResult # Pastikan import models di sini juga
-        santri = Santri.query.filter_by(kode_santri=kode_santri).first()
-        if not santri:
-            return jsonify({'error': f'Santri with NIS {kode_santri} not found.'}), 404
-        
-        predictions = PredictionResult.query.filter_by(santri_id=santri.santri_id).order_by(PredictionResult.predicted_at.desc()).all()
-        
-        prediction_list = []
-        for pred in predictions:
-            prediction_list.append({
-                'prediction_id': pred.prediction_id,
-                'tingkat_hafalan': pred.tingkat_hafalan,
-                'jumlah_setoran': pred.jumlah_setoran,
-                'kehadiran': pred.kehadiran,
-                'hasil_prediksi': pred.hasil_prediksi,
-                'predicted_at': pred.predicted_at.isoformat() # Format tanggal ke string ISO 8601
-            })
-        return jsonify(prediction_list), 200
-
-    # Endpoint untuk API Aplikasi Mobile
-    @app.route('/api/login', methods=['POST'])
-    def api_login():
-        from app.models import Admin, Guru, Santri # Import model di sini
-        
-        try:
-            data = request.get_json(silent=True)
-            if data is None or not isinstance(data, dict):
-                return jsonify({'message': 'Invalid JSON or missing JSON in request body'}), 400
-
-            user_type = data.get('user_type')
-            credential = data.get('credential')
-            password = data.get('password')
-
-            if not all([user_type, credential]):
-                return jsonify({'message': 'Missing user_type or credential'}), 400
-
-            user = None
-            if user_type == 'Admin':
-                if not password:
-                    return jsonify({'message': 'Password is required for Admin login'}), 400
-                user = Admin.query.filter_by(username=credential).first()
-                if user and user.check_password(password):
-                    return jsonify({'message': 'Login successful!', 'display_name': user.nama_lengkap}), 200
-                else:
-                    return jsonify({'message': 'Invalid Admin credentials'}), 401
-            elif user_type == 'Guru':
-                user = Guru.query.filter_by(kode_guru=credential).first()
-                if user:
-                    return jsonify({'message': 'Login successful!', 'display_name': user.nama_lengkap}), 200
-                else:
-                    return jsonify({'message': 'Invalid Guru credentials'}), 401
-            elif user_type == 'Santri':
-                user = Santri.query.filter_by(kode_santri=credential).first()
-                if user:
-                    return jsonify({'message': 'Login successful!', 'display_name': user.nama_lengkap, 'profile_picture': user.profile_picture}), 200
-                else:
-                    return jsonify({'message': 'Invalid Santri credentials'}), 401
-            elif user_type == 'Orang Tua Santri':
-                user = Santri.query.filter_by(nama_lengkap=credential).first()
-                if user:
-                    return jsonify({'message': 'Login successful!', 'display_name': user.nama_orang_tua}), 200
-                else:
-                    return jsonify({'message': 'Invalid Orang Tua Santri credentials'}), 401
-
-            return jsonify({'message': 'Invalid user type'}), 400
-
-        except Exception as e:
-            return jsonify({'message': f'An unexpected error occurred: {str(e)}'}), 500
-
-    # Endpoint untuk API Profil Santri
-    @app.route('/api/santri_profile/<string:kode_santri>', methods=['GET'])
-    def santri_profile(kode_santri):
-        from app.models import Santri
-        santri = Santri.query.filter_by(kode_santri=kode_santri).first()
-        if santri:
-            return jsonify({
-                'nama_lengkap': santri.nama_lengkap,
-                'kode_santri': santri.kode_santri,
-                'tingkatan': santri.tingkatan,
-                'alamat': santri.alamat,
-                'nama_orang_tua': santri.nama_orang_tua,
-                'profile_picture': santri.profile_picture # Sertakan path gambar profil
-            }), 200
-        else:
-            return jsonify({'message': 'Santri not found'}), 404
-
-    # Endpoint untuk API Profil Guru
-    @app.route('/api/guru_profile/<string:kode_guru>', methods=['GET'])
-    def guru_profile(kode_guru):
-        from app.models import Guru
-        guru = Guru.query.filter_by(kode_guru=kode_guru).first()
-        if guru:
-            return jsonify({
-                'nama_lengkap': guru.nama_lengkap,
-                'kode_guru': guru.kode_guru,
-                'status_pengajar': guru.status_pengajar,
-                'nomor_telepon': guru.nomor_telepon,
-                'profile_picture': guru.profile_picture
-            }), 200
-        else:
-            return jsonify({'message': 'Guru not found'}), 404
-
-    # Endpoint untuk API Profil Orang Tua Santri
-    @app.route('/api/orangtua_profile/<string:nama_santri>', methods=['GET'])
-    def orangtua_profile(nama_santri):
-        from app.models import Santri, OrangTuaSantri
-        santri = Santri.query.filter_by(nama_lengkap=nama_santri).first()
-        if not santri:
-            return jsonify({'message': 'Santri not found'}), 404
-        ortu = OrangTuaSantri.query.filter_by(santri_id=santri.santri_id).first()
-        if ortu:
-            return jsonify({
-                'nama': ortu.nama,
-                'alamat': ortu.alamat,
-                'nama_santri': nama_santri,
-                'nomor_telepon': ortu.nomor_telepon
-            }), 200
-        else:
-            return jsonify({'message': 'Orang Tua Santri not found'}), 404
-
-    @app.route('/orangtua', methods=['GET', 'POST'])
-    def manajemen_orangtua():
-        if request.method == 'POST':
-            nama = request.form['nama']
-            alamat = request.form.get('alamat')
-            nama_santri = request.form['nama_santri']
-            nomor_telepon = request.form.get('nomor_telepon')
-            ortu = OrangTuaSantri(
-                nama=nama,
-                alamat=alamat,
-                nama_santri=nama_santri,
-                nomor_telepon=nomor_telepon
-            )
-            db.session.add(ortu)
-            db.session.commit()
-            return redirect(url_for('manajemen_orangtua'))
-        ortus = OrangTuaSantri.query.all()
-        return render_template('orangtua.html', ortus=ortus)
-
-    @app.route('/orangtua/edit/<int:ortu_id>', methods=['GET', 'POST'])
-    def edit_orangtua(ortu_id):
-        ortu = OrangTuaSantri.query.get_or_404(ortu_id)
-        if request.method == 'POST':
-            ortu.nama = request.form['nama']
-            ortu.alamat = request.form.get('alamat')
-            ortu.nama_santri = request.form['nama_santri']
-            ortu.nomor_telepon = request.form.get('nomor_telepon')
-            db.session.commit()
-            return redirect(url_for('manajemen_orangtua'))
-        return render_template('edit_orangtua.html', ortu=ortu)
-
-    @app.route('/orangtua/delete/<int:ortu_id>', methods=['POST'])
-    def delete_orangtua(ortu_id):
-        ortu = OrangTuaSantri.query.get_or_404(ortu_id)
-        db.session.delete(ortu)
-        db.session.commit()
-        return redirect(url_for('manajemen_orangtua'))
-
     # Endpoint untuk Penilaian Hafalan (POST)
     @app.route('/api/penilaian', methods=['POST'])
     def api_penilaian():
         from app.models import Santri, PenilaianHafalan
-        data = request.get_json()
-        if not data:
-            return jsonify({'error': 'Request body must be JSON'}), 400
         try:
-            kode_santri = data['kode_santri']
-            surat = data['surat']
-            dari_ayat = int(data['dari_ayat'])
-            sampai_ayat = int(data['sampai_ayat'])
-            penilaian_tajwid = data['penilaian_tajwid']
-        except KeyError as e:
-            return jsonify({'error': f'Missing required field: {e}'}), 400
-        except ValueError:
-            return jsonify({'error': 'dari_ayat dan sampai_ayat harus berupa angka'}), 400
+            data = request.get_json()
+            if not data:
+                return jsonify({'error': 'Request body must be JSON'}), 400
+            
+            # Pastikan model Naive Bayes dan encoder sudah dimuat
+            global naive_bayes_model, le_hasil_penilaian
+            if naive_bayes_model is None or le_hasil_penilaian is None:
+                print("Error: Naive Bayes model or encoder not loaded.")
+                return jsonify({'error': 'Machine Learning model not loaded on server.'}), 500
 
-        santri = Santri.query.filter_by(kode_santri=kode_santri).first()
-        if not santri:
-            return jsonify({'error': f'Santri dengan NIS {kode_santri} tidak ditemukan.'}), 404
+            try:
+                kode_santri = data['kode_santri']
+                surat = data['surat']
+                dari_ayat = int(data['dari_ayat'])
+                sampai_ayat = int(data['sampai_ayat'])
+                penilaian_tajwid = int(data['penilaian_tajwid']) # Diubah menjadi int
+                kelancaran = int(data['kelancaran']) # Field baru
+                kefasihan = int(data['kefasihan']) # Field baru
+            except KeyError as e:
+                return jsonify({'error': f'Missing required field: {e}'}), 400
+            except ValueError:
+                return jsonify({'error': 'dari_ayat, sampai_ayat, penilaian_tajwid, kelancaran, dan kefasihan harus berupa angka'}), 400
 
-        penilaian = PenilaianHafalan(
-            santri_id=santri.santri_id,
-            surat=surat,
-            dari_ayat=dari_ayat,
-            sampai_ayat=sampai_ayat,
-            penilaian_tajwid=penilaian_tajwid
-        )
-        db.session.add(penilaian)
-        db.session.commit()
-        return jsonify({'message': 'Penilaian hafalan berhasil disimpan.'}), 200
+            santri = Santri.query.filter_by(kode_santri=kode_santri).first()
+            if not santri:
+                return jsonify({'error': f'Santri dengan NIS {kode_santri} tidak ditemukan.'}), 404
+
+            # Prediksi dengan Naive Bayes
+            try:
+                input_features = np.array([[penilaian_tajwid, kelancaran, kefasihan]])
+                predicted_encoded = naive_bayes_model.predict(input_features)
+                hasil_prediksi_naive_bayes = le_hasil_penilaian.inverse_transform(predicted_encoded)[0]
+            except Exception as e:
+                # Ini akan menangkap error dari prediksi model itu sendiri
+                return jsonify({'error': f'Gagal memprediksi dengan Naive Bayes: {e}'}), 500
+
+            penilaian = PenilaianHafalan(
+                santri_id=santri.santri_id,
+                surat=surat,
+                dari_ayat=dari_ayat,
+                sampai_ayat=sampai_ayat,
+                penilaian_tajwid=penilaian_tajwid,
+                kelancaran=kelancaran,
+                kefasihan=kefasihan,
+                hasil_naive_bayes=hasil_prediksi_naive_bayes # Simpan hasil prediksi
+            )
+            db.session.add(penilaian)
+            db.session.commit()
+            return jsonify({'message': 'Penilaian hafalan berhasil disimpan.', 'hasil_prediksi_naive_bayes': hasil_prediksi_naive_bayes}), 200
+        except Exception as e:
+            # Tangkap setiap exception yang tidak tertangkap di atas dan kembalikan JSON error
+            print(f"Unhandled error in api_penilaian: {e}")
+            return jsonify({'error': f'Terjadi kesalahan server tidak terduga: {e}'}), 500
 
     # Endpoint untuk mengambil riwayat penilaian hafalan santri
     @app.route('/api/santri/<string:kode_santri>/penilaian', methods=['GET'])
@@ -491,6 +329,9 @@ def register_routes(app):
                 'dari_ayat': p.dari_ayat,
                 'sampai_ayat': p.sampai_ayat,
                 'penilaian_tajwid': p.penilaian_tajwid,
+                'kelancaran': p.kelancaran,
+                'kefasihan': p.kefasihan,
+                'hasil_naive_bayes': p.hasil_naive_bayes, # Tambahkan ini
                 'tanggal_penilaian': p.tanggal_penilaian.isoformat()
             })
         return jsonify(result), 200
@@ -508,6 +349,57 @@ def register_routes(app):
             })
         return jsonify(result), 200
 
+    # Endpoint untuk profil santri
+    @app.route('/api/santri_profile/<string:credential>', methods=['GET'])
+    def santri_profile(credential):
+        from app.models import Santri
+        santri = Santri.query.filter_by(kode_santri=credential).first()
+        if not santri:
+            return jsonify({'message': 'Santri not found'}), 404
+        
+        profile_data = {
+            'nama_lengkap': santri.nama_lengkap,
+            'nis': santri.kode_santri, # Menggunakan kode_santri sebagai NIS
+            'kelas': santri.tingkatan, # Menggunakan tingkatan sebagai kelas
+            'alamat': santri.alamat,
+            'profile_picture': santri.profile_picture
+        }
+        return jsonify(profile_data), 200
+
+    # Endpoint untuk profil guru
+    @app.route('/api/guru_profile/<string:credential>', methods=['GET'])
+    def guru_profile(credential):
+        from app.models import Guru
+        guru = Guru.query.filter_by(kode_guru=credential).first()
+        if not guru:
+            return jsonify({'message': 'Guru not found'}), 404
+
+        profile_data = {
+            'nama_lengkap': guru.nama_lengkap,
+            'nip': guru.kode_guru,
+            'pendidikan_terakhir': guru.status_pengajar, # Menggunakan status_pengajar sebagai pendidikan terakhir
+            'nomor_telepon': guru.nomor_telepon,
+            'profile_picture': guru.profile_picture
+        }
+        return jsonify(profile_data), 200
+
+    # Endpoint untuk profil orang tua santri
+    @app.route('/api/orangtua_profile/<string:credential>', methods=['GET'])
+    def orangtua_profile(credential):
+        from app.models import OrangTuaSantri
+        orangtua = OrangTuaSantri.query.filter_by(nama_santri_terkait=credential).first()
+        if not orangtua:
+            return jsonify({'message': 'Orang Tua Santri not found'}), 404
+        
+        profile_data = {
+            'nama': orangtua.nama,
+            'nama_santri': orangtua.santri.nama_lengkap, # Mengambil nama santri dari relasi
+            'alamat': orangtua.alamat,
+            'nomor_telepon': orangtua.nomor_telepon,
+            'profile_picture': orangtua.santri.profile_picture # Asumsi foto profil ortu sama dengan santri terkait
+        }
+        return jsonify(profile_data), 200
+
     # Endpoint Login Admin (Web)
     @app.route('/login_admin', methods=['GET', 'POST'])
     def login_admin():
@@ -524,6 +416,46 @@ def register_routes(app):
             else:
                 error = 'Username atau password salah.'
         return render_template('login_admin.html', error=error)
+
+    @app.route('/api/login', methods=['POST'])
+    def api_login():
+        data = request.get_json()
+        if not data:
+            return jsonify({'message': 'Request body must be JSON'}), 400
+
+        user_type = data.get('user_type')
+        credential = data.get('credential')
+        # password = data.get('password') # Hapus password dari data yang diharapkan
+
+        if not user_type or not credential:
+            return jsonify({'message': 'Missing user_type or credential'}), 400
+
+        user = None
+        display_name = ''
+
+        if user_type == 'Guru':
+            user = Guru.query.filter_by(kode_guru=credential).first()
+            if user:
+                display_name = user.nama_lengkap
+        elif user_type == 'Santri':
+            user = Santri.query.filter_by(kode_santri=credential).first()
+            if user:
+                display_name = user.nama_lengkap
+        elif user_type == 'Orang Tua Santri':
+            user = OrangTuaSantri.query.filter_by(nama_santri_terkait=credential).first()
+            if user:
+                display_name = user.nama # Asumsi OrangTuaSantri memiliki field nama
+
+        # Modifikasi kondisi login: cek keberadaan user saja, tanpa password
+        if user:
+            return jsonify({
+                'message': 'Login successful',
+                'user_type': user_type,
+                'credential': credential,
+                'display_name': display_name
+            }), 200
+        else:
+            return jsonify({'message': 'Invalid credentials'}), 401
 
     @app.route('/')
     def admin_dashboard():

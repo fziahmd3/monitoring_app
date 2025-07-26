@@ -45,7 +45,7 @@ def get_engine_url():
 # target_metadata = mymodel.Base.metadata
 config.set_main_option('sqlalchemy.url', get_engine_url())
 try:
-target_db = current_app.extensions['migrate'].db
+    target_db = current_app.extensions['migrate'].db
 except Exception:
     target_db = None
 
@@ -57,9 +57,9 @@ except Exception:
 
 def get_metadata():
     if target_db is not None:
-    if hasattr(target_db, 'metadatas'):
-        return target_db.metadatas[None]
-    return target_db.metadata
+        if hasattr(target_db, 'metadatas'):
+            return target_db.metadatas[None]
+        return target_db.metadata
     return None
 
 
@@ -89,21 +89,24 @@ def run_migrations_online():
     try:
         # Jika context Flask aktif
         conf_args = current_app.extensions['migrate'].configure_args
-    def process_revision_directives(context, revision, directives):
-        if getattr(config.cmd_opts, 'autogenerate', False):
-            script = directives[0]
-            if script.upgrade_ops.is_empty():
-                directives[:] = []
-                logger.info('No changes in schema detected.')
-    if conf_args.get("process_revision_directives") is None:
-        conf_args["process_revision_directives"] = process_revision_directives
-    connectable = get_engine()
-    with connectable.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=get_metadata(),
-            **conf_args
-        )
+        
+        def process_revision_directives(context, revision, directives):
+            if getattr(config.cmd_opts, 'autogenerate', False):
+                script = directives[0]
+                if script.upgrade_ops.is_empty():
+                    directives[:] = []
+                    logger.info('No changes in schema detected.')
+        
+        if conf_args.get("process_revision_directives") is None:
+            conf_args["process_revision_directives"] = process_revision_directives
+        
+        connectable = get_engine()
+        with connectable.connect() as connection:
+            context.configure(
+                connection=connection,
+                target_metadata=get_metadata(),
+                **conf_args
+            )
             with context.begin_transaction():
                 context.run_migrations()
     except Exception:
@@ -115,8 +118,8 @@ def run_migrations_online():
                 connection=connection,
                 target_metadata=None
             )
-        with context.begin_transaction():
-            context.run_migrations()
+            with context.begin_transaction():
+                context.run_migrations()
 
 
 if context.is_offline_mode():
