@@ -1,59 +1,74 @@
 import os
 from flask import request, jsonify, render_template, redirect, url_for, session
 from app.extensions import db # Import db dari extensions.py
-from app.data_migration import model, le_tingkat, le_kemajuan # Import model dan encoder dari data_migration.py
+import pickle # Import pickle
+# from app.data_migration import model, le_tingkat, le_kemajuan # Import model dan encoder dari data_migration.py
 from werkzeug.security import generate_password_hash, check_password_hash # Meskipun ini tidak langsung dipakai di sini, tapi di models.py
 from werkzeug.utils import secure_filename
 import datetime
 import numpy as np
 from app.models import Santri, Guru, Admin, OrangTuaSantri, PenilaianHafalan # Import semua models yang dibutuhkan
-from sklearn.naive_bayes import GaussianNB # Import Gaussian Naive Bayes
-from sklearn.preprocessing import LabelEncoder # Import LabelEncoder
+# from sklearn.naive_bayes import GaussianNB # Import Gaussian Naive Bayes
+# from sklearn.preprocessing import LabelEncoder # Import LabelEncoder
 
 # Direktori untuk menyimpan foto profil
 UPLOAD_FOLDER = 'app/static/profile_pics'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
 
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def register_routes(app):
-    # Inisialisasi dan latih model Naive Bayes sederhana
+    # Definisikan UPLOAD_FOLDER dan ALLOWED_EXTENSIONS di level fungsi
+    UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'static', 'recordings')
+    ALLOWED_EXTENSIONS = {'m4a', 'mp3', 'wav', 'aac'}
+
+    def allowed_file(filename):
+        return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+    # Muat model dan encoder Naive Bayes yang sudah dilatih
     global naive_bayes_model, le_hasil_penilaian
+    try:
+        # Pastikan jalur relatif sudah benar dari root aplikasi
+        with open('output/naive_bayes_model.pkl', 'rb') as f_model:
+            naive_bayes_model = pickle.load(f_model)
+        with open('output/naive_bayes_encoder.pkl', 'rb') as f_enc:
+            le_hasil_penilaian = pickle.load(f_enc)
+        print("Naive Bayes model and encoder for penilaian loaded successfully from output/.")
+    except FileNotFoundError:
+        print("Error: Model Naive Bayes atau encoder tidak ditemukan di folder output/. Pastikan build_model.py telah dijalankan.")
+        naive_bayes_model = None
+        le_hasil_penilaian = None
+    except Exception as e:
+        print(f"Error loading Naive Bayes model or encoder: {e}")
+        naive_bayes_model = None
+        le_hasil_penilaian = None
     
-    # Contoh data pelatihan (X: tajwid, kelancaran, kefasihan; y: hasil penilaian)
-    # Ini adalah contoh sederhana. Dalam aplikasi nyata, Anda akan melatih ini dengan data historis yang lebih besar.
-    X_train_nb = np.array([
-        [5, 5, 5], # Sangat Baik
-        [4, 5, 4], # Sangat Baik
-        [5, 4, 5], # Sangat Baik
-        [4, 4, 4], # Baik
-        [3, 4, 3], # Baik
-        [4, 3, 4], # Baik
-        [3, 3, 3], # Cukup
-        [2, 3, 2], # Cukup
-        [3, 2, 3], # Cukup
-        [2, 2, 2], # Kurang
-        [1, 2, 1], # Kurang
-        [2, 1, 2], # Kurang
-        [1, 1, 1], # Sangat Kurang
-    ])
-    y_train_nb = np.array([
-        'Sangat Baik', 'Sangat Baik', 'Sangat Baik',
-        'Baik', 'Baik', 'Baik',
-        'Cukup', 'Cukup', 'Cukup',
-        'Kurang', 'Kurang', 'Kurang',
-        'Sangat Kurang',
-    ])
-
-    le_hasil_penilaian = LabelEncoder()
-    y_train_encoded = le_hasil_penilaian.fit_transform(y_train_nb)
-
-    naive_bayes_model = GaussianNB()
-    naive_bayes_model.fit(X_train_nb, y_train_encoded)
-    
-    print("Naive Bayes model and encoder for penilaian loaded successfully.")
+    # from app.data_migration import model, le_tingkat, le_kemajuan
+    # Inisialisasi model untuk predict_web (jika terpisah)
+    global model, le_tingkat, le_kemajuan
+    try:
+        with open('output/model.pkl', 'rb') as f_model_general:
+            model = pickle.load(f_model_general)
+        with open('output/encoder.pkl', 'rb') as f_enc_general:
+            encoders = pickle.load(f_enc_general)
+            le_tingkat = encoders['tingkat_hafalan']
+            le_kemajuan = encoders['kemajuan']
+        print("General prediction model and encoders loaded successfully from output/.")
+    except FileNotFoundError:
+        print("Error: General prediction model or encoders not found in output/ folder. Ensure build_model.py has been run.")
+        model = None
+        le_tingkat = None
+        le_kemajuan = None
+    except Exception as e:
+        print(f"Error loading general prediction model or encoders: {e}")
+        model = None
+        le_tingkat = None
+        le_kemajuan = None
 
     # Pastikan direktori upload ada
     if not os.path.exists(UPLOAD_FOLDER):
@@ -277,6 +292,7 @@ def register_routes(app):
                 penilaian_tajwid = int(data['penilaian_tajwid']) # Diubah menjadi int
                 kelancaran = int(data['kelancaran']) # Field baru
                 kefasihan = int(data['kefasihan']) # Field baru
+                catatan = data.get('catatan', '') # Field baru untuk catatan (opsional)
             except KeyError as e:
                 return jsonify({'error': f'Missing required field: {e}'}), 400
             except ValueError:
@@ -303,6 +319,7 @@ def register_routes(app):
                 penilaian_tajwid=penilaian_tajwid,
                 kelancaran=kelancaran,
                 kefasihan=kefasihan,
+                catatan=catatan, # Simpan catatan
                 hasil_naive_bayes=hasil_prediksi_naive_bayes # Simpan hasil prediksi
             )
             db.session.add(penilaian)
@@ -331,6 +348,7 @@ def register_routes(app):
                 'penilaian_tajwid': p.penilaian_tajwid,
                 'kelancaran': p.kelancaran,
                 'kefasihan': p.kefasihan,
+                'catatan': p.catatan, # Tambahkan catatan
                 'hasil_naive_bayes': p.hasil_naive_bayes, # Tambahkan ini
                 'tanggal_penilaian': p.tanggal_penilaian.isoformat()
             })
@@ -460,3 +478,58 @@ def register_routes(app):
     @app.route('/')
     def admin_dashboard():
         return render_template('dashboard.html')
+
+    @app.route('/upload_recording', methods=['POST'])
+    def upload_recording():
+        print("=== Upload Recording Request ===")
+        print(f"Files: {list(request.files.keys())}")
+        print(f"Form data: {list(request.form.keys())}")
+        
+        if 'recording' not in request.files:
+            print("Error: No 'recording' file in request")
+            return jsonify({'success': False, 'message': 'No file part'}), 400
+        
+        file = request.files['recording']
+        kode_santri = request.form.get('kodeSantri')
+        kode_guru = request.form.get('kodeGuru')
+        
+        print(f"File: {file.filename if file else 'None'}")
+        print(f"Kode Santri: {kode_santri}")
+        print(f"Kode Guru: {kode_guru}")
+        
+        if not file or file.filename == '':
+            print("Error: No selected file")
+            return jsonify({'success': False, 'message': 'No selected file'}), 400
+        
+        if not kode_santri:
+            print("Error: Missing kodeSantri")
+            return jsonify({'success': False, 'message': 'Missing kodeSantri'}), 400
+        
+        # Jika kodeGuru tidak ada, gunakan kodeSantri sebagai guru (self-recording)
+        if not kode_guru:
+            kode_guru = kode_santri
+            print(f"Using kodeSantri as kodeGuru: {kode_guru}")
+        
+        if file and allowed_file(file.filename):
+            filename = secure_filename(f"{kode_guru}_{kode_santri}_{file.filename}")
+            save_path = os.path.join(UPLOAD_FOLDER, filename)
+            print(f"Saving file to: {save_path}")
+            file.save(save_path)
+            print("File saved successfully")
+            # TODO: Simpan info ke database jika perlu
+            return jsonify({'success': True, 'message': 'File uploaded', 'filename': filename}), 200
+        else:
+            print(f"Error: File type not allowed. Filename: {file.filename}")
+            return jsonify({'success': False, 'message': 'File type not allowed'}), 400
+
+    @app.route('/api/rekaman_santri/<kode_santri>', methods=['GET'])
+    def get_rekaman_santri(kode_santri):
+        rekaman_dir = os.path.join(os.path.dirname(__file__), 'static', 'recordings')
+        files = []
+        if os.path.exists(rekaman_dir):
+            for filename in os.listdir(rekaman_dir):
+                # Format nama file: {kode_guru}_{kode_santri}_{original_filename}
+                parts = filename.split('_')
+                if len(parts) >= 3 and parts[1] == kode_santri:
+                    files.append(filename)
+        return jsonify({'files': files})

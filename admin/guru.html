@@ -31,7 +31,7 @@
                     <td>{{ guru.nomor_telepon }}</td>
                     <td>
                         <a href="/guru/edit/{{ guru.guru_id }}">Edit</a>
-                        <form action="/guru/delete/{{ guru.guru_id }}" method="POST" style="display:inline;">
+                        <form action="/guru/delete/{{ guru.guru_id }}" method="POST" style="display:inline; width: 100px;">
                             <button type="submit" onclick="return confirm('Anda yakin ingin menghapus guru ini?');" class="button-as-link">Hapus</button>
                         </form>
                     </td>

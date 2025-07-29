@@ -107,6 +107,7 @@ class PenilaianHafalan(db.Model):
     penilaian_tajwid = db.Column(db.Integer, nullable=False) # Diubah menjadi Integer
     kelancaran = db.Column(db.Integer, nullable=False) # Field baru
     kefasihan = db.Column(db.Integer, nullable=False) # Field baru
+    catatan = db.Column(db.Text, nullable=True) # Field baru untuk catatan
     hasil_naive_bayes = db.Column(db.String(50), nullable=False, default='Belum Diprediksi') # Diubah menjadi not nullable dengan default
     tanggal_penilaian = db.Column(db.DateTime, default=db.func.current_timestamp())
 

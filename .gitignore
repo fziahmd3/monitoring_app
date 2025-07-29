@@ -18,3 +18,4 @@ model.ipynb
 # Jupyter
 .ipynb_checkpoints 
 venv
+.vercel
