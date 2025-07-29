@@ -19,3 +19,6 @@ model.ipynb
 .ipynb_checkpoints 
 venv
 .vercel
+
+# Media
+app/static/recording/
