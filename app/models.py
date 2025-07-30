@@ -101,6 +101,7 @@ class PenilaianHafalan(db.Model):
     __tablename__ = 'PenilaianHafalan'
     penilaian_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     santri_id = db.Column(db.Integer, db.ForeignKey('Santri.santri_id'), nullable=False)
+    guru_id = db.Column(db.Integer, db.ForeignKey('Guru.guru_id'), nullable=False) # Tambahkan field guru
     surat = db.Column(db.String(50), nullable=False)
     dari_ayat = db.Column(db.Integer, nullable=False)
     sampai_ayat = db.Column(db.Integer, nullable=False)
@@ -112,6 +113,7 @@ class PenilaianHafalan(db.Model):
     tanggal_penilaian = db.Column(db.DateTime, default=db.func.current_timestamp())
 
     santri = db.relationship('Santri', backref=db.backref('penilaian_hafalan', lazy=True))
+    guru = db.relationship('Guru', backref=db.backref('penilaian_hafalan', lazy=True))
 
     def __repr__(self):
         return f'<PenilaianHafalan {self.penilaian_id} - Santri ID: {self.santri_id}>'

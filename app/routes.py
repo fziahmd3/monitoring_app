@@ -286,6 +286,7 @@ def register_routes(app):
 
             try:
                 kode_santri = data['kode_santri']
+                kode_guru = data.get('kode_guru', kode_santri) # Ambil kode guru, default ke kode santri jika tidak ada
                 surat = data['surat']
                 dari_ayat = int(data['dari_ayat'])
                 sampai_ayat = int(data['sampai_ayat'])
@@ -301,6 +302,10 @@ def register_routes(app):
             santri = Santri.query.filter_by(kode_santri=kode_santri).first()
             if not santri:
                 return jsonify({'error': f'Santri dengan NIS {kode_santri} tidak ditemukan.'}), 404
+                
+            guru = Guru.query.filter_by(kode_guru=kode_guru).first()
+            if not guru:
+                return jsonify({'error': f'Guru dengan kode {kode_guru} tidak ditemukan.'}), 404
 
             # Prediksi dengan Naive Bayes
             try:
@@ -311,8 +316,10 @@ def register_routes(app):
                 # Ini akan menangkap error dari prediksi model itu sendiri
                 return jsonify({'error': f'Gagal memprediksi dengan Naive Bayes: {e}'}), 500
 
+            # Untuk sementara, simpan tanpa guru_id karena belum ada migration
             penilaian = PenilaianHafalan(
                 santri_id=santri.santri_id,
+                # guru_id=guru.guru_id, # Akan diaktifkan setelah migration
                 surat=surat,
                 dari_ayat=dari_ayat,
                 sampai_ayat=sampai_ayat,
@@ -481,55 +488,151 @@ def register_routes(app):
 
     @app.route('/upload_recording', methods=['POST'])
     def upload_recording():
-        print("=== Upload Recording Request ===")
-        print(f"Files: {list(request.files.keys())}")
-        print(f"Form data: {list(request.form.keys())}")
-        
-        if 'recording' not in request.files:
-            print("Error: No 'recording' file in request")
-            return jsonify({'success': False, 'message': 'No file part'}), 400
-        
-        file = request.files['recording']
-        kode_santri = request.form.get('kodeSantri')
-        kode_guru = request.form.get('kodeGuru')
-        
-        print(f"File: {file.filename if file else 'None'}")
-        print(f"Kode Santri: {kode_santri}")
-        print(f"Kode Guru: {kode_guru}")
-        
-        if not file or file.filename == '':
-            print("Error: No selected file")
-            return jsonify({'success': False, 'message': 'No selected file'}), 400
-        
-        if not kode_santri:
-            print("Error: Missing kodeSantri")
-            return jsonify({'success': False, 'message': 'Missing kodeSantri'}), 400
-        
-        # Jika kodeGuru tidak ada, gunakan kodeSantri sebagai guru (self-recording)
-        if not kode_guru:
-            kode_guru = kode_santri
-            print(f"Using kodeSantri as kodeGuru: {kode_guru}")
-        
-        if file and allowed_file(file.filename):
-            filename = secure_filename(f"{kode_guru}_{kode_santri}_{file.filename}")
-            save_path = os.path.join(UPLOAD_FOLDER, filename)
-            print(f"Saving file to: {save_path}")
-            file.save(save_path)
-            print("File saved successfully")
-            # TODO: Simpan info ke database jika perlu
-            return jsonify({'success': True, 'message': 'File uploaded', 'filename': filename}), 200
-        else:
-            print(f"Error: File type not allowed. Filename: {file.filename}")
-            return jsonify({'success': False, 'message': 'File type not allowed'}), 400
+        try:
+            print("=== Upload Recording Request ===")
+            print(f"Files: {list(request.files.keys())}")
+            print(f"Form data: {list(request.form.keys())}")
+            
+            if 'recording' not in request.files:
+                print("Error: No 'recording' file in request")
+                return jsonify({'success': False, 'message': 'No file part'}), 400
+            
+            file = request.files['recording']
+            kode_santri = request.form.get('kodeSantri')
+            kode_guru = request.form.get('kodeGuru')
+            
+            print(f"File: {file.filename if file else 'None'}")
+            print(f"Kode Santri: {kode_santri}")
+            print(f"Kode Guru: {kode_guru}")
+            
+            if not file or file.filename == '':
+                print("Error: No selected file")
+                return jsonify({'success': False, 'message': 'No selected file'}), 400
+            
+            if not kode_santri:
+                print("Error: Missing kodeSantri")
+                return jsonify({'success': False, 'message': 'Missing kodeSantri'}), 400
+            
+            # Jika kodeGuru tidak ada, gunakan kodeSantri sebagai guru (self-recording)
+            if not kode_guru:
+                kode_guru = kode_santri
+                print(f"Using kodeSantri as kodeGuru: {kode_guru}")
+            
+            if file and allowed_file(file.filename):
+                base_filename = f"{kode_guru}_{kode_santri}_hafalan_recording_{int(datetime.datetime.now().timestamp() * 1000)}.wav"
+                filename = secure_filename(base_filename)
+                save_path = os.path.join(UPLOAD_FOLDER, filename)
+                print(f"Saving file to: {save_path}")
+                
+                # Pastikan folder upload ada
+                os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+                
+                file.save(save_path)
+                print("File saved successfully")
+                # TODO: Simpan info ke database jika perlu
+                return jsonify({'success': True, 'message': 'File uploaded', 'filename': filename}), 200
+            else:
+                print(f"Error: File type not allowed. Filename: {file.filename}")
+                return jsonify({'success': False, 'message': 'File type not allowed'}), 400
+        except Exception as e:
+            print(f"Error in upload_recording: {e}")
+            return jsonify({'success': False, 'message': f'Server error: {str(e)}'}), 500
 
     @app.route('/api/rekaman_santri/<kode_santri>', methods=['GET'])
     def get_rekaman_santri(kode_santri):
-        rekaman_dir = os.path.join(os.path.dirname(__file__), 'static', 'recordings')
-        files = []
-        if os.path.exists(rekaman_dir):
-            for filename in os.listdir(rekaman_dir):
-                # Format nama file: {kode_guru}_{kode_santri}_{original_filename}
+        try:
+            # Gunakan UPLOAD_FOLDER yang sama dengan endpoint upload
+            rekaman_dir = UPLOAD_FOLDER
+            files = []
+            if os.path.exists(rekaman_dir):
+                for filename in os.listdir(rekaman_dir):
+                    # Format nama file: {kode_guru}_{kode_santri}_{original_filename}
+                    parts = filename.split('_')
+                    if len(parts) >= 3 and parts[1] == kode_santri:
+                        files.append(filename)
+            return jsonify({'files': files})
+        except Exception as e:
+            print(f"Error in get_rekaman_santri: {e}")
+            return jsonify({'files': [], 'error': str(e)}), 500
+
+    @app.route('/api/rekaman_guru/<kode_guru>', methods=['GET'])
+    def get_rekaman_guru(kode_guru):
+        try:
+            kode_santri = request.args.get('kode_santri')
+            print(f"=== Get Rekaman Guru ===")
+            print(f"Kode Guru: {kode_guru}")
+            print(f"Kode Santri (query param): {kode_santri}")
+            print(f"Upload Folder: {UPLOAD_FOLDER}")
+            print(f"Request URL: {request.url}")
+            print(f"Request args: {request.args}")
+            
+            rekaman_dir = UPLOAD_FOLDER
+            files = []
+            if os.path.exists(rekaman_dir):
+                all_files = os.listdir(rekaman_dir)
+                print(f"All files in directory: {all_files}")
+                for filename in all_files:
+                    # Format nama file: {kode_guru}_{kode_santri}_{original_filename}
+                    parts = filename.split('_')
+                    print(f"File: {filename}, Parts: {parts}")
+                    print(f"Checking if parts[0] == kode_guru: {parts[0]} == {kode_guru} -> {parts[0] == kode_guru}")
+                    if len(parts) >= 3 and parts[0] == kode_guru:
+                        print(f"File matches guru: {filename}")
+                        # Jika ada kode_santri, filter berdasarkan santri
+                        if kode_santri:
+                            print(f"Filtering by santri: {kode_santri}")
+                            print(f"Checking if parts[1] == kode_santri: {parts[1]} == {kode_santri} -> {parts[1] == kode_santri}")
+                            if len(parts) >= 2 and parts[1] == kode_santri:
+                                files.append(filename)
+                                print(f"Added file (filtered by santri): {filename}")
+                            else:
+                                print(f"File does not match santri filter: {filename}")
+                        else:
+                            # Jika tidak ada kode_santri, tampilkan semua rekaman untuk guru tersebut
+                            files.append(filename)
+                            print(f"Added file (all for guru): {filename}")
+                    else:
+                        print(f"File does not match guru: {filename}")
+            print(f"Final files list: {files}")
+            return jsonify({'files': files})
+        except Exception as e:
+            print(f"Error in get_rekaman_guru: {e}")
+            return jsonify({'files': [], 'error': str(e)}), 500
+
+    # Endpoint test untuk debugging
+    @app.route('/api/test_rekaman', methods=['GET'])
+    def test_rekaman():
+        try:
+            print("=== Test Rekaman Endpoint ===")
+            rekaman_dir = UPLOAD_FOLDER
+            all_files = os.listdir(rekaman_dir) if os.path.exists(rekaman_dir) else []
+            print(f"All files: {all_files}")
+            
+            # Test parsing
+            for filename in all_files:
                 parts = filename.split('_')
-                if len(parts) >= 3 and parts[1] == kode_santri:
-                    files.append(filename)
-        return jsonify({'files': files})
+                print(f"File: {filename}, Parts: {parts}")
+            
+            return jsonify({
+                'upload_folder': UPLOAD_FOLDER,
+                'exists': os.path.exists(rekaman_dir),
+                'all_files': all_files,
+                'test_files': [f for f in all_files if f.endswith('.m4a')]
+            })
+        except Exception as e:
+            print(f"Error in test_rekaman: {e}")
+            return jsonify({'error': str(e)}), 500
+
+    # Endpoint test koneksi sederhana
+    @app.route('/api/test_connection', methods=['GET'])
+    def test_connection():
+        try:
+            print("=== Test Connection Endpoint ===")
+            return jsonify({
+                'status': 'success',
+                'message': 'Backend is running',
+                'timestamp': datetime.datetime.now().isoformat()
+            })
+        except Exception as e:
+            print(f"Error in test_connection: {e}")
+            return jsonify({'error': str(e)}), 500
