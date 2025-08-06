@@ -30,23 +30,23 @@ def register_routes(app):
     def allowed_file(filename):
         return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-    # Muat model dan encoder Naive Bayes yang sudah dilatih
-    global naive_bayes_model, le_hasil_penilaian
+    # Muat model dan KKM Naive Bayes yang sudah dilatih
+    global naive_bayes_model, kkm
     try:
         # Pastikan jalur relatif sudah benar dari root aplikasi
         with open('output/naive_bayes_model.pkl', 'rb') as f_model:
             naive_bayes_model = pickle.load(f_model)
-        with open('output/naive_bayes_encoder.pkl', 'rb') as f_enc:
-            le_hasil_penilaian = pickle.load(f_enc)
-        print("Naive Bayes model and encoder for penilaian loaded successfully from output/.")
+        with open('output/kkm.pkl', 'rb') as f_kkm:
+            kkm = pickle.load(f_kkm)
+        print("Naive Bayes model and KKM for penilaian loaded successfully from output/.")
     except FileNotFoundError:
-        print("Error: Model Naive Bayes atau encoder tidak ditemukan di folder output/. Pastikan build_model.py telah dijalankan.")
+        print("Error: Model Naive Bayes atau KKM tidak ditemukan di folder output/. Pastikan build_model.py telah dijalankan.")
         naive_bayes_model = None
-        le_hasil_penilaian = None
+        kkm = None
     except Exception as e:
-        print(f"Error loading Naive Bayes model or encoder: {e}")
+        print(f"Error loading Naive Bayes model or KKM: {e}")
         naive_bayes_model = None
-        le_hasil_penilaian = None
+        kkm = None
     
     # from app.data_migration import model, le_tingkat, le_kemajuan
     # Inisialisasi model untuk predict_web (jika terpisah)
@@ -61,11 +61,6 @@ def register_routes(app):
         print("General prediction model and encoders loaded successfully from output/.")
     except FileNotFoundError:
         print("Error: General prediction model or encoders not found in output/ folder. Ensure build_model.py has been run.")
-        model = None
-        le_tingkat = None
-        le_kemajuan = None
-    except Exception as e:
-        print(f"Error loading general prediction model or encoders: {e}")
         model = None
         le_tingkat = None
         le_kemajuan = None
@@ -214,6 +209,55 @@ def register_routes(app):
         db.session.commit()
         return redirect(url_for('manajemen_santri'))
 
+    # Endpoint untuk Manajemen Orang Tua Santri
+    @app.route('/orangtua', methods=['GET', 'POST'])
+    def manajemen_orangtua():
+        from app.models import OrangTuaSantri, Santri
+        if request.method == 'POST':
+            nama = request.form['nama']
+            kode_orangtua = request.form['kode_orangtua']
+            alamat = request.form.get('alamat')
+            nomor_telepon = request.form.get('nomor_telepon')
+            santri_id = request.form.get('santri_id')
+
+            new_orangtua = OrangTuaSantri(
+                nama=nama,
+                kode_orangtua=kode_orangtua,
+                alamat=alamat,
+                nomor_telepon=nomor_telepon,
+                santri_id=santri_id
+            )
+            db.session.add(new_orangtua)
+            db.session.commit()
+            return redirect(url_for('manajemen_orangtua'))
+        
+        orangtua_list = OrangTuaSantri.query.all()
+        santri_list = Santri.query.all()  # Untuk dropdown pilihan santri
+        return render_template('orangtua.html', orangtua_list=orangtua_list, santri_list=santri_list)
+
+    @app.route('/orangtua/edit/<int:orangtua_id>', methods=['GET', 'POST'])
+    def edit_orangtua(orangtua_id):
+        from app.models import OrangTuaSantri, Santri
+        orangtua = OrangTuaSantri.query.get_or_404(orangtua_id)
+        if request.method == 'POST':
+            orangtua.nama = request.form['nama']
+            orangtua.kode_orangtua = request.form['kode_orangtua']
+            orangtua.alamat = request.form.get('alamat')
+            orangtua.nomor_telepon = request.form.get('nomor_telepon')
+            orangtua.santri_id = request.form.get('santri_id')
+            db.session.commit()
+            return redirect(url_for('manajemen_orangtua'))
+        santri_list = Santri.query.all()  # Untuk dropdown pilihan santri
+        return render_template('edit_orangtua.html', orangtua=orangtua, santri_list=santri_list)
+
+    @app.route('/orangtua/delete/<int:orangtua_id>', methods=['POST'])
+    def delete_orangtua(orangtua_id):
+        from app.models import OrangTuaSantri
+        orangtua = OrangTuaSantri.query.get_or_404(orangtua_id)
+        db.session.delete(orangtua)
+        db.session.commit()
+        return redirect(url_for('manajemen_orangtua'))
+
     # Endpoint untuk Halaman Input Web (Frontend Form)
     @app.route('/predict_form')
     def predict_form_page():
@@ -278,10 +322,10 @@ def register_routes(app):
             if not data:
                 return jsonify({'error': 'Request body must be JSON'}), 400
             
-            # Pastikan model Naive Bayes dan encoder sudah dimuat
-            global naive_bayes_model, le_hasil_penilaian
-            if naive_bayes_model is None or le_hasil_penilaian is None:
-                print("Error: Naive Bayes model or encoder not loaded.")
+            # Pastikan model Naive Bayes dan KKM sudah dimuat
+            global naive_bayes_model, kkm
+            if naive_bayes_model is None or kkm is None:
+                print("Error: Naive Bayes model or KKM not loaded.")
                 return jsonify({'error': 'Machine Learning model not loaded on server.'}), 500
 
             try:
@@ -290,14 +334,32 @@ def register_routes(app):
                 surat = data['surat']
                 dari_ayat = int(data['dari_ayat'])
                 sampai_ayat = int(data['sampai_ayat'])
-                penilaian_tajwid = int(data['penilaian_tajwid']) # Diubah menjadi int
-                kelancaran = int(data['kelancaran']) # Field baru
-                kefasihan = int(data['kefasihan']) # Field baru
+                # Mapping kategori ke angka jika perlu
+                kategori_ke_float = {
+                    'Sangat Baik': 4.0,
+                    'Baik': 3.0,
+                    'Cukup': 2.0,
+                    'Kurang': 1.0
+                }
+                def parse_nilai(val):
+                    if isinstance(val, str) and val in kategori_ke_float:
+                        return kategori_ke_float[val]
+                    try:
+                        return float(val)
+                    except Exception:
+                        return 0.0
+                penilaian_tajwid = parse_nilai(data['penilaian_tajwid']) # Skala 1-100 atau kategori
+                kelancaran = parse_nilai(data['kelancaran']) # Skala 1-100 atau kategori
+                kefasihan = parse_nilai(data['kefasihan']) # Skala 1-100 atau kategori
                 catatan = data.get('catatan', '') # Field baru untuk catatan (opsional)
             except KeyError as e:
                 return jsonify({'error': f'Missing required field: {e}'}), 400
             except ValueError:
                 return jsonify({'error': 'dari_ayat, sampai_ayat, penilaian_tajwid, kelancaran, dan kefasihan harus berupa angka'}), 400
+
+            # Validasi skala nilai (1-100)
+            if not (1 <= penilaian_tajwid <= 100 and 1 <= kelancaran <= 100 and 1 <= kefasihan <= 100):
+                return jsonify({'error': 'Nilai tajwid, kelancaran, dan kefasihan harus dalam skala 1-100'}), 400
 
             santri = Santri.query.filter_by(kode_santri=kode_santri).first()
             if not santri:
@@ -307,19 +369,28 @@ def register_routes(app):
             if not guru:
                 return jsonify({'error': f'Guru dengan kode {kode_guru} tidak ditemukan.'}), 404
 
-            # Prediksi dengan Naive Bayes
+            # Prediksi dengan Naive Bayes untuk mendapatkan nilai akhir
             try:
-                input_features = np.array([[penilaian_tajwid, kelancaran, kefasihan]])
-                predicted_encoded = naive_bayes_model.predict(input_features)
-                hasil_prediksi_naive_bayes = le_hasil_penilaian.inverse_transform(predicted_encoded)[0]
+                # Hitung rata-rata dari 3 komponen penilaian
+                rata_rata_nilai = (penilaian_tajwid + kelancaran + kefasihan) / 3
+                
+                # Gunakan rata-rata sebagai nilai akhir
+                predicted_nilai = round(rata_rata_nilai)
+                
+                # Tentukan status lulus/tidak lulus berdasarkan KKM
+                status_lulus = "LULUS" if predicted_nilai >= kkm else "TIDAK LULUS"
+                warna_hasil = "hijau" if predicted_nilai >= kkm else "merah"
+                
+                hasil_prediksi_naive_bayes = f"{predicted_nilai:.0f}"
+                
             except Exception as e:
                 # Ini akan menangkap error dari prediksi model itu sendiri
                 return jsonify({'error': f'Gagal memprediksi dengan Naive Bayes: {e}'}), 500
 
-            # Untuk sementara, simpan tanpa guru_id karena belum ada migration
+            # Simpan penilaian dengan guru_id
             penilaian = PenilaianHafalan(
                 santri_id=santri.santri_id,
-                # guru_id=guru.guru_id, # Akan diaktifkan setelah migration
+                guru_id=guru.guru_id, # Aktifkan guru_id setelah migration
                 surat=surat,
                 dari_ayat=dari_ayat,
                 sampai_ayat=sampai_ayat,
@@ -331,7 +402,14 @@ def register_routes(app):
             )
             db.session.add(penilaian)
             db.session.commit()
-            return jsonify({'message': 'Penilaian hafalan berhasil disimpan.', 'hasil_prediksi_naive_bayes': hasil_prediksi_naive_bayes}), 200
+            
+            return jsonify({
+                'message': 'Penilaian hafalan berhasil disimpan.', 
+                'hasil_prediksi_naive_bayes': hasil_prediksi_naive_bayes,
+                'status_lulus': status_lulus,
+                'warna_hasil': warna_hasil,
+                'kkm': kkm
+            }), 200
         except Exception as e:
             # Tangkap setiap exception yang tidak tertangkap di atas dan kembalikan JSON error
             print(f"Unhandled error in api_penilaian: {e}")
@@ -412,18 +490,108 @@ def register_routes(app):
     @app.route('/api/orangtua_profile/<string:credential>', methods=['GET'])
     def orangtua_profile(credential):
         from app.models import OrangTuaSantri
-        orangtua = OrangTuaSantri.query.filter_by(nama_santri_terkait=credential).first()
+        orangtua = OrangTuaSantri.query.filter_by(kode_orangtua=credential).first()
         if not orangtua:
             return jsonify({'message': 'Orang Tua Santri not found'}), 404
         
         profile_data = {
             'nama': orangtua.nama,
             'nama_santri': orangtua.santri.nama_lengkap, # Mengambil nama santri dari relasi
+            'kode_santri': orangtua.santri.kode_santri, # Tambahkan kode santri
             'alamat': orangtua.alamat,
             'nomor_telepon': orangtua.nomor_telepon,
             'profile_picture': orangtua.santri.profile_picture # Asumsi foto profil ortu sama dengan santri terkait
         }
         return jsonify(profile_data), 200
+
+    # Endpoint untuk mendapatkan progress anak dari orang tua
+    @app.route('/api/orangtua/<string:kode_orangtua>/progress_anak', methods=['GET'])
+    def get_progress_anak(kode_orangtua):
+        try:
+            print(f"=== Get Progress Anak for Orang Tua: {kode_orangtua} ===")
+            
+            def parse_float(val):
+                try:
+                    return float(val)
+                except Exception:
+                    return 0.0
+            # Cari orang tua
+            orangtua = OrangTuaSantri.query.filter_by(kode_orangtua=kode_orangtua).first()
+            print(f"Orang tua found: {orangtua is not None}")
+            
+            if not orangtua:
+                print(f"Orang tua dengan kode {kode_orangtua} tidak ditemukan")
+                return jsonify({'error': 'Orang tua tidak ditemukan'}), 404
+            
+            # Ambil data santri (anak)
+            santri = orangtua.santri
+            if not santri:
+                return jsonify({'error': 'Data santri tidak ditemukan'}), 404
+            
+            # Ambil data penilaian santri
+            penilaian_list = PenilaianHafalan.query.filter_by(santri_id=santri.santri_id).order_by(PenilaianHafalan.tanggal_penilaian.desc()).all()
+            
+            if not penilaian_list:
+                return jsonify({
+                    'santri_info': {
+                        'nama': santri.nama_lengkap,
+                        'kode_santri': santri.kode_santri,
+                        'tingkatan': santri.tingkatan
+                    },
+                    'progress_summary': {
+                        'total_penilaian': 0,
+                        'rata_rata_nilai': 0,
+                        'status_terakhir': 'Belum ada penilaian',
+                        'surat_terakhir': '-',
+                        'tanggal_terakhir': '-'
+                    },
+                    'recent_penilaian': []
+                })
+            
+            # Hitung statistik
+            total_penilaian = len(penilaian_list)
+            total_nilai = sum(parse_float(p.hasil_naive_bayes) for p in penilaian_list if p.hasil_naive_bayes and p.hasil_naive_bayes != 'Belum Diprediksi')
+            rata_rata_nilai = total_nilai / total_penilaian if total_penilaian > 0 else 0
+            
+            # Status terakhir
+            penilaian_terakhir = penilaian_list[0]
+            status_terakhir = 'LULUS' if parse_float(penilaian_terakhir.hasil_naive_bayes) >= 75 else 'TIDAK LULUS'
+            
+            # Data penilaian terbaru (5 terakhir)
+            recent_penilaian = []
+            for p in penilaian_list[:5]:
+                recent_penilaian.append({
+                    'surat': p.surat,
+                    'dari_ayat': p.dari_ayat,
+                    'sampai_ayat': p.sampai_ayat,
+                    'nilai': p.hasil_naive_bayes,
+                    'status': 'LULUS' if parse_float(p.hasil_naive_bayes) >= 75 else 'TIDAK LULUS',
+                    'tanggal': p.tanggal_penilaian.strftime('%Y-%m-%d') if p.tanggal_penilaian else 'N/A',
+                    'catatan': p.catatan if p.catatan else None
+                })
+            
+            result = {
+                'santri_info': {
+                    'nama': santri.nama_lengkap,
+                    'kode_santri': santri.kode_santri,
+                    'tingkatan': santri.tingkatan
+                },
+                'progress_summary': {
+                    'total_penilaian': total_penilaian,
+                    'rata_rata_nilai': round(rata_rata_nilai, 2),
+                    'status_terakhir': status_terakhir,
+                    'surat_terakhir': penilaian_terakhir.surat,
+                    'tanggal_terakhir': penilaian_terakhir.tanggal_penilaian.strftime('%Y-%m-%d') if penilaian_terakhir.tanggal_penilaian else 'N/A'
+                },
+                'recent_penilaian': recent_penilaian
+            }
+            
+            print(f"Progress anak result: {result}")
+            return jsonify(result)
+            
+        except Exception as e:
+            print(f"Error in get_progress_anak: {e}")
+            return jsonify({'error': str(e)}), 500
 
     # Endpoint Login Admin (Web)
     @app.route('/login_admin', methods=['GET', 'POST'])
@@ -441,46 +609,6 @@ def register_routes(app):
             else:
                 error = 'Username atau password salah.'
         return render_template('login_admin.html', error=error)
-
-    @app.route('/api/login', methods=['POST'])
-    def api_login():
-        data = request.get_json()
-        if not data:
-            return jsonify({'message': 'Request body must be JSON'}), 400
-
-        user_type = data.get('user_type')
-        credential = data.get('credential')
-        # password = data.get('password') # Hapus password dari data yang diharapkan
-
-        if not user_type or not credential:
-            return jsonify({'message': 'Missing user_type or credential'}), 400
-
-        user = None
-        display_name = ''
-
-        if user_type == 'Guru':
-            user = Guru.query.filter_by(kode_guru=credential).first()
-            if user:
-                display_name = user.nama_lengkap
-        elif user_type == 'Santri':
-            user = Santri.query.filter_by(kode_santri=credential).first()
-            if user:
-                display_name = user.nama_lengkap
-        elif user_type == 'Orang Tua Santri':
-            user = OrangTuaSantri.query.filter_by(nama_santri_terkait=credential).first()
-            if user:
-                display_name = user.nama # Asumsi OrangTuaSantri memiliki field nama
-
-        # Modifikasi kondisi login: cek keberadaan user saja, tanpa password
-        if user:
-            return jsonify({
-                'message': 'Login successful',
-                'user_type': user_type,
-                'credential': credential,
-                'display_name': display_name
-            }), 200
-        else:
-            return jsonify({'message': 'Invalid credentials'}), 401
 
     @app.route('/')
     def admin_dashboard():
@@ -636,3 +764,223 @@ def register_routes(app):
         except Exception as e:
             print(f"Error in test_connection: {e}")
             return jsonify({'error': str(e)}), 500
+
+    # Endpoint untuk summary hafalan santri
+    @app.route('/api/santri/<string:kode_santri>/summary', methods=['GET'])
+    def get_summary_hafalan(kode_santri):
+        try:
+            print(f"=== Get Summary Hafalan for {kode_santri} ===")
+            # Ambil data penilaian santri
+            penilaian_list = PenilaianHafalan.query.filter_by(santri_id=kode_santri).all()
+            
+            if not penilaian_list:
+                print("No penilaian data found")
+                return jsonify({
+                    'total_surat': 0,
+                    'total_ayat': 0,
+                    'rata_tajwid': 0,
+                    'sesi_hari_ini': 0
+                })
+            
+            # Hitung total surat unik
+            surat_unik = set()
+            total_ayat = 0
+            total_tajwid = 0
+            sesi_hari_ini = 0
+            
+            # Mapping nilai tajwid
+            nilai_tajwid = {
+                'Kurang': 1,
+                'Cukup': 2,
+                'Baik': 3,
+                'Sangat Baik': 4
+            }
+            
+            today = datetime.datetime.now().date()
+            
+            for penilaian in penilaian_list:
+                surat_unik.add(penilaian.surat)
+                total_ayat += (penilaian.sampai_ayat - penilaian.dari_ayat + 1)
+                
+                # Hitung nilai tajwid
+                if penilaian.penilaian_tajwid in nilai_tajwid:
+                    total_tajwid += nilai_tajwid[penilaian.penilaian_tajwid]
+                
+                # Hitung sesi hari ini
+                if penilaian.tanggal_penilaian and penilaian.tanggal_penilaian.date() == today:
+                    sesi_hari_ini += 1
+            
+            rata_tajwid = total_tajwid / len(penilaian_list) if penilaian_list else 0
+            
+            result = {
+                'total_surat': len(surat_unik),
+                'total_ayat': total_ayat,
+                'rata_tajwid': round(rata_tajwid, 2),
+                'sesi_hari_ini': sesi_hari_ini
+            }
+            
+            print(f"Summary result: {result}")
+            return jsonify(result)
+            
+        except Exception as e:
+            print(f"Error in get_summary_hafalan: {e}")
+            return jsonify({'error': str(e)}), 500
+
+    # Endpoint untuk overview santri
+    @app.route('/api/santri/<string:kode_santri>/overview', methods=['GET'])
+    def get_overview_santri(kode_santri):
+        try:
+            print(f"=== Get Overview for {kode_santri} ===")
+            from app.models import PenilaianHafalan, Santri
+            
+            # Ambil data santri
+            santri = Santri.query.filter_by(nis=kode_santri).first()
+            if not santri:
+                return jsonify({'error': 'Santri not found'}), 404
+            
+            # Ambil data penilaian santri
+            penilaian_list = PenilaianHafalan.query.filter_by(santri_id=kode_santri).order_by(PenilaianHafalan.tanggal_penilaian.desc()).all()
+            
+            # Hitung statistik
+            total_surat = len(set([p.surat for p in penilaian_list])) if penilaian_list else 0
+            total_ayat = sum([(p.sampai_ayat - p.dari_ayat + 1) for p in penilaian_list]) if penilaian_list else 0
+            
+            # Hitung rata-rata nilai
+            total_nilai = 0
+            nilai_count = 0
+            for penilaian in penilaian_list:
+                try:
+                    nilai = int(penilaian.hasil_naive_bayes)
+                    total_nilai += nilai
+                    nilai_count += 1
+                except (ValueError, TypeError):
+                    continue
+            
+            rata_nilai = round(total_nilai / nilai_count, 1) if nilai_count > 0 else 0
+            
+            # Hitung sesi hari ini
+            from datetime import datetime, date
+            today = date.today()
+            sesi_hari_ini = len([p for p in penilaian_list if p.tanggal_penilaian and p.tanggal_penilaian.date() == today])
+            
+            # Hitung progress percentage (contoh: berdasarkan jumlah surat)
+            # Asumsikan target adalah 30 surat (bisa disesuaikan)
+            target_surat = 30
+            progress_percentage = min(total_surat / target_surat, 1.0) if target_surat > 0 else 0.0
+            
+            # Ambil surat terakhir
+            surat_terakhir = penilaian_list[0].surat if penilaian_list else '-'
+            
+            # Hitung juz terakhir (contoh sederhana)
+            juz_terakhir = 0
+            if penilaian_list:
+                # Mapping sederhana surat ke juz (bisa disesuaikan)
+                surat_to_juz = {
+                    'Al-Fatihah': 1, 'Al-Baqarah': 1, 'Al-Imran': 2, 'An-Nisa': 2,
+                    'Al-Maidah': 3, 'Al-Anam': 3, 'Al-Araf': 4, 'Al-Anfal': 4,
+                    # ... tambahkan mapping lainnya
+                }
+                juz_terakhir = surat_to_juz.get(surat_terakhir, 0)
+            
+            result = {
+                'total_surat': total_surat,
+                'total_ayat': total_ayat,
+                'rata_nilai': rata_nilai,
+                'sesi_hari_ini': sesi_hari_ini,
+                'progress_percentage': progress_percentage,
+                'surat_terakhir': surat_terakhir,
+                'juz_terakhir': f'Juz {juz_terakhir}' if juz_terakhir > 0 else '-',
+            }
+            
+            print(f"Overview result: {result}")
+            return jsonify(result)
+            
+        except Exception as e:
+            print(f"Error in get_overview_santri: {e}")
+            return jsonify({'error': str(e)}), 500
+
+    # Endpoint untuk log harian santri
+    @app.route('/api/santri/<string:kode_santri>/log-harian', methods=['GET'])
+    def get_log_harian(kode_santri):
+        try:
+            print(f"=== Get Log Harian for {kode_santri} ===")
+            # Ambil data penilaian santri untuk log harian
+            penilaian_list = PenilaianHafalan.query.filter_by(santri_id=kode_santri).order_by(PenilaianHafalan.tanggal_penilaian.desc()).limit(10).all()
+            
+            log_harian = []
+            
+            for penilaian in penilaian_list:
+                log_entry = {
+                    'jenis': 'penilaian',
+                    'aktivitas': f'Hafalan {penilaian.surat} (Ayat {penilaian.dari_ayat}-{penilaian.sampai_ayat})',
+                    'tanggal': penilaian.tanggal_penilaian.strftime('%Y-%m-%d') if penilaian.tanggal_penilaian else 'N/A',
+                    'catatan': penilaian.catatan if penilaian.catatan else None
+                }
+                log_harian.append(log_entry)
+            
+            print(f"Log harian result: {len(log_harian)} entries")
+            return jsonify(log_harian)
+            
+        except Exception as e:
+            print(f"Error in get_log_harian: {e}")
+            return jsonify({'error': str(e)}), 500
+
+    # Endpoint login untuk aplikasi mobile
+    @app.route('/api/login', methods=['POST'])
+    def api_login():
+        try:
+            print("=== API Login Endpoint ===")
+            data = request.get_json()
+            
+            if not data:
+                return jsonify({'message': 'Data tidak valid'}), 400
+            
+            user_type = data.get('user_type')
+            credential = data.get('credential')
+            
+            print(f"User Type: {user_type}")
+            print(f"Credential: {credential}")
+            
+            if not user_type or not credential:
+                return jsonify({'message': 'Tipe pengguna dan kredensial harus diisi'}), 400
+            
+            # Cari user berdasarkan tipe dan kredensial
+            user = None
+            display_name = None
+            
+            if user_type == 'Santri':
+                user = Santri.query.filter_by(kode_santri=credential).first()
+                if user:
+                    display_name = user.nama_lengkap
+            elif user_type == 'Guru':
+                user = Guru.query.filter_by(kode_guru=credential).first()
+                if user:
+                    display_name = user.nama_lengkap
+            elif user_type == 'Orang Tua Santri':
+                user = OrangTuaSantri.query.filter_by(kode_orangtua=credential).first()
+                if user:
+                    display_name = user.nama
+            elif user_type == 'Admin':
+                user = Admin.query.filter_by(username=credential).first()
+                if user:
+                    display_name = user.username
+            
+            if user:
+                print(f"User found: {display_name}")
+                # Update last_login untuk user yang ditemukan
+                user.last_login = datetime.datetime.now()
+                db.session.commit()
+                
+                return jsonify({
+                    'message': 'Login berhasil',
+                    'user_type': user_type,
+                    'credential': credential,
+                    'display_name': display_name
+                }), 200
+            else:
+                print(f"User not found for {user_type}: {credential}")
+                return jsonify({'message': 'Kredensial tidak valid atau pengguna tidak ditemukan'}), 401
+                
+        except Exception as e:
+            print(f"Error in api_login: {e}")
+            return jsonify({'message': f'Terjadi kesalahan server: {str(e)}'}), 500

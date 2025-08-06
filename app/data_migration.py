@@ -29,7 +29,7 @@ def create_app():
     # Konfigurasi Database MySQL
     app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
         'DATABASE_URL',
-        'mysql+pymysql://root:@localhost:3306/monitoring_app' # Ganti dengan kredensial MySQL Anda yang sebenarnya
+        'mysql+pymysql://monitoringapp:monitoringhafalan25@localhost:3306/monitoring_app' # Menggunakan user monitoringapp
     )
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['SECRET_KEY'] = 'your_super_secret_key_here' # Ganti dengan kunci rahasia yang kuat

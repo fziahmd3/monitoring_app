@@ -91,17 +91,28 @@ class OrangTuaSantri(db.Model):
     alamat = db.Column(db.String(255), nullable=True)
     santri_id = db.Column(db.Integer, db.ForeignKey('Santri.santri_id'), nullable=False)
     nomor_telepon = db.Column(db.String(20), nullable=True)
+    kode_orangtua = db.Column(db.String(20), unique=True, nullable=False)  # Tambahkan kode untuk login
+    password_hash = db.Column(db.String(128), nullable=False)  # Tambahkan password
+    last_login = db.Column(db.DateTime)  # Tambahkan last_login
+    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+    updated_at = db.Column(db.DateTime, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
 
     santri = db.relationship('Santri', backref=db.backref('orangtua', lazy=True))
 
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
     def __repr__(self):
-        return f'<OrangTuaSantri {self.nama}>'
+        return f'<OrangTuaSantri {self.nama} (Kode: {self.kode_orangtua})>'
 
 class PenilaianHafalan(db.Model):
     __tablename__ = 'PenilaianHafalan'
     penilaian_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     santri_id = db.Column(db.Integer, db.ForeignKey('Santri.santri_id'), nullable=False)
-    guru_id = db.Column(db.Integer, db.ForeignKey('Guru.guru_id'), nullable=False) # Tambahkan field guru
+    guru_id = db.Column(db.Integer, db.ForeignKey('Guru.guru_id'), nullable=True) # Tambahkan field guru (nullable untuk data lama)
     surat = db.Column(db.String(50), nullable=False)
     dari_ayat = db.Column(db.Integer, nullable=False)
     sampai_ayat = db.Column(db.Integer, nullable=False)

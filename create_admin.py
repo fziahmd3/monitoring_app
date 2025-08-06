@@ -6,7 +6,7 @@ app = create_app()
 
 # Data akun admin
 USERNAME = "monitoring1"
-PASSWORD = "monitoring1"
+PASSWORD = "monitoringhafalan25"
 
 with app.app_context():
     # Cek apakah username sudah ada

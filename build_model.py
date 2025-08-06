@@ -5,97 +5,64 @@ from sklearn.model_selection import train_test_split
 import pickle
 import numpy as np # Tambahkan numpy
 
-# 1. Dummy dataset
-data = {
-    'tingkat_hafalan': ['tinggi', 'rendah', 'sedang', 'tinggi', 'sedang', 'rendah'],
-    'jumlah_setoran': [15, 5, 10, 18, 9, 4],
-    'kehadiran': [95, 60, 80, 100, 85, 55],
-    'kemajuan': ['baik', 'kurang', 'cukup', 'baik', 'cukup', 'kurang']
-}
-df = pd.DataFrame(data)
-
-# 2. Encode fitur kategorikal
-le_tingkat = LabelEncoder()
-df['tingkat_hafalan'] = le_tingkat.fit_transform(df['tingkat_hafalan'])
-
-# 3. Fitur dan target
-X = df[['tingkat_hafalan', 'jumlah_setoran', 'kehadiran']]
-y = df['kemajuan']
-
-# 4. Encode target
-le_kemajuan = LabelEncoder()
-y_encoded = le_kemajuan.fit_transform(y)
-
-# 5. Split data dan latih model
-X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=0.2, random_state=42)
-model = MultinomialNB()
-model.fit(X_train, y_train)
-
-# 6. Simpan model dan encoder
-with open('output/model.pkl', 'wb') as f_model:
-    pickle.dump(model, f_model)
-
-with open('output/encoder.pkl', 'wb') as f_enc:
-    pickle.dump({
-        'tingkat_hafalan': le_tingkat,
-        'kemajuan': le_kemajuan
-    }, f_enc)
-
-# Simpan juga model dan encoder untuk penilaian (Gaussian Naive Bayes)
-# Jika ada model Gaussian Naive Bayes terpisah yang dilatih di sini
-# Periksa apakah ada inisialisasi model GaussianNB di build_model.py yang terlewat
-# Jika tidak ada, bagian ini tidak diperlukan di build_model.py, hanya di app/routes.py
-# Namun, jika Anda ingin menyertakan model yang dilatih di build_model.py, maka tambahkan kode berikut
-# Untuk saat ini, asumsikan model Naive Bayes yang digunakan di app/routes.py dilatih secara terpisah dari model ini.
-# Jika Anda ingin model di app/routes.py memuat model yang dilatih di build_model.py, 
-# maka kita harus mengganti model.pkl dan encoder.pkl dengan model dan encoder yang digunakan untuk prediksi di routes.py
-# Berdasarkan app/routes.py, ada 2 set model: satu untuk 'predict_web' (model, le_tingkat, le_kemajuan) 
-# dan satu lagi untuk '/api/penilaian' (naive_bayes_model, le_hasil_penilaian).
-# build_model.py saat ini melatih model untuk 'predict_web'.
-# Jadi, kita hanya perlu memastikan model.pkl dan encoder.pkl terbuat dengan benar.
-# Jika model naive_bayes_model dan le_hasil_penilaian juga dilatih secara terpisah 
-# (seperti di contoh data pelatihan di app/routes.py), 
-# maka kita tidak perlu menyimpannya dari build_model.py.
-# Namun, jika Anda ingin menyimpannya dari build_model.py, Anda perlu melatihnya di sini juga.
-
-print("Model dan encoder berhasil disimpan.")
-
-# --- Bagian untuk model Penilaian Hafalan (Gaussian Naive Bayes) ---
-# Contoh data pelatihan (X: tajwid, kelancaran, kefasihan; y: hasil penilaian)
+# --- Bagian untuk model Penilaian Hafalan (Gaussian Naive Bayes) dengan skala 1-100 ---
+# Contoh data pelatihan dengan skala 1-100
+# Data ini akan digunakan untuk memprediksi nilai akhir (1-100)
 X_train_nb = np.array([
-    [5, 5, 5], # Sangat Baik
-    [4, 5, 4], # Sangat Baik
-    [5, 4, 5], # Sangat Baik
-    [4, 4, 4], # Baik
-    [3, 4, 3], # Baik
-    [4, 3, 4], # Baik
-    [3, 3, 3], # Cukup
-    [2, 3, 2], # Cukup
-    [3, 2, 3], # Cukup
-    [2, 2, 2], # Kurang
-    [1, 2, 1], # Kurang
-    [2, 1, 2], # Kurang
-    [1, 1, 1], # Sangat Kurang
-])
-y_train_nb = np.array([
-    'Sangat Baik', 'Sangat Baik', 'Sangat Baik',
-    'Baik', 'Baik', 'Baik',
-    'Cukup', 'Cukup', 'Cukup',
-    'Kurang', 'Kurang', 'Kurang',
-    'Sangat Kurang',
+    # Tajwid, Kelancaran, Kefasihan (semua dalam skala 1-100)
+    [95, 95, 95], # Nilai tinggi
+    [90, 95, 90], # Nilai tinggi
+    [95, 90, 95], # Nilai tinggi
+    [85, 90, 85], # Nilai baik
+    [80, 85, 80], # Nilai baik
+    [85, 80, 85], # Nilai baik
+    [75, 80, 75], # Nilai cukup (KKM)
+    [75, 80, 75], # Nilai cukup (KKM)
+    [70, 75, 70], # Nilai cukup
+    [75, 70, 75], # Nilai cukup
+    [65, 70, 65], # Nilai kurang
+    [60, 65, 60], # Nilai kurang
+    [70, 60, 70], # Nilai kurang
+    [55, 60, 55], # Nilai sangat kurang
+    [50, 55, 50], # Nilai sangat kurang
+    [45, 50, 45], # Nilai sangat kurang
+    [40, 45, 40], # Nilai sangat kurang
+    [35, 40, 35], # Nilai sangat kurang
+    [30, 35, 30], # Nilai sangat kurang
+    [25, 30, 25], # Nilai sangat kurang
+    [20, 25, 20], # Nilai sangat kurang
+    [15, 20, 15], # Nilai sangat kurang
+    [10, 15, 10], # Nilai sangat kurang
+    [5, 10, 5],   # Nilai sangat kurang
+    [1, 5, 1],    # Nilai sangat kurang
 ])
 
-le_hasil_penilaian = LabelEncoder()
-y_train_encoded = le_hasil_penilaian.fit_transform(y_train_nb)
+# Target: nilai akhir (1-100) yang diprediksi berdasarkan rata-rata dari 3 komponen
+y_train_nb = np.array([
+    95, 92, 93,  # Nilai tinggi (lulus)
+    87, 82, 83,  # Nilai baik (lulus)
+    77, 75,  # Nilai cukup (lulus)
+    72, 73, 67, # Nilai kurang (tidak lulus)
+    62, 67,  # Nilai kurang (tidak lulus)
+    57, 52, 47,  # Nilai sangat kurang (tidak lulus)
+    42, 37, 32,  # Nilai sangat kurang (tidak lulus)
+    27, 22, 17,  # Nilai sangat kurang (tidak lulus)
+    12, 7, 2,    # Nilai sangat kurang (tidak lulus)
+])
+
+# Untuk model ini, kita tidak perlu LabelEncoder karena target adalah nilai numerik
+# Kita akan menggunakan model regresi atau tetap menggunakan GaussianNB untuk klasifikasi nilai
 
 naive_bayes_model = GaussianNB()
-naive_bayes_model.fit(X_train_nb, y_train_encoded)
+naive_bayes_model.fit(X_train_nb, y_train_nb)
 
-# Simpan model dan encoder untuk penilaian hafalan
+# Simpan model untuk penilaian hafalan
 with open('output/naive_bayes_model.pkl', 'wb') as f_nb_model:
     pickle.dump(naive_bayes_model, f_nb_model)
 
-with open('output/naive_bayes_encoder.pkl', 'wb') as f_nb_enc:
-    pickle.dump(le_hasil_penilaian, f_nb_enc)
+# Simpan KKM sebagai konstanta
+kkm = 75
+with open('output/kkm.pkl', 'wb') as f_kkm:
+    pickle.dump(kkm, f_kkm)
 
-print("Model Naive Bayes untuk penilaian hafalan dan encoder berhasil disimpan.")
+print("Model Naive Bayes untuk penilaian hafalan dengan skala 1-100 dan KKM berhasil disimpan.")
