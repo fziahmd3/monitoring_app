@@ -944,15 +944,15 @@ def register_routes(app):
             if not user_type or not credential:
                 return jsonify({'message': 'Tipe pengguna dan kredensial harus diisi'}), 400
             
-            # Cari user berdasarkan tipe dan kredensial
+            # Nonaktifkan login Santri (belum diperlukan)
+            if user_type == 'Santri':
+                return jsonify({'message': 'Login untuk akun Santri belum tersedia. Silakan pilih tipe pengguna lain.'}), 403
+
+            # Cari user berdasarkan tipe dan kredensial (selain Santri)
             user = None
             display_name = None
-            
-            if user_type == 'Santri':
-                user = Santri.query.filter_by(kode_santri=credential).first()
-                if user:
-                    display_name = user.nama_lengkap
-            elif user_type == 'Guru':
+
+            if user_type == 'Guru':
                 user = Guru.query.filter_by(kode_guru=credential).first()
                 if user:
                     display_name = user.nama_lengkap

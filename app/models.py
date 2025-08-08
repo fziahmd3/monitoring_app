@@ -67,22 +67,7 @@ class Santri(db.Model):
     def __repr__(self):
         return f'<Santri {self.nama_lengkap} (Kode: {self.kode_santri})>'
 
-# Model Hasil Prediksi
-# class PredictionResult(db.Model):
-#     __tablename__ = 'PredictionResult'
-#     prediction_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-#     santri_id = db.Column(db.Integer, db.ForeignKey('Santri.santri_id'), nullable=False)
-#     tingkat_hafalan = db.Column(db.String(50), nullable=False)
-#     jumlah_setoran = db.Column(db.Integer, nullable=False)
-#     kehadiran = db.Column(db.Integer, nullable=False)
-#     hasil_prediksi = db.Column(db.String(50), nullable=False)
-#     predicted_at = db.Column(db.DateTime, default=db.func.current_timestamp())
-#
-#     # Relasi dengan model Santri
-#     santri = db.relationship('Santri', backref=db.backref('predictions', lazy=True))
-#
-#     def __repr__(self):
-#         return f'<PredictionResult {self.prediction_id} for Santri ID: {self.santri_id}>'
+
 
 class OrangTuaSantri(db.Model):
     __tablename__ = 'OrangTuaSantri'
